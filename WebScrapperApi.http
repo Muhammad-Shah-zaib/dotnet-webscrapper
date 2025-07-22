@@ -1,0 +1,131 @@
+### Health Check
+GET https://localhost:7001/api/scraper/health
+
+### Get Available Categories
+GET https://localhost:7001/api/scraper/categories
+
+### Get Configuration
+GET https://localhost:7001/api/scraper/config
+
+### Scrape All Categories (with MongoDB storage)
+POST https://localhost:7001/api/scraper/scrape-all-categories
+Content-Type: application/json
+
+{
+  "email": "your-email@example.com",
+  "password": "your-password",
+  "headless": false,
+  "downloadImages": false,
+  "storeInMongoDB": true,
+  "outputFile": "cater_choice_products.json"
+}
+
+### Scrape All Categories (without MongoDB storage - file only)
+POST https://localhost:7001/api/scraper/scrape-all-categories
+Content-Type: application/json
+
+{
+  "email": "your-email@example.com",
+  "password": "your-password",
+  "headless": false,
+  "downloadImages": false,
+  "storeInMongoDB": false,
+  "outputFile": "cater_choice_products.json"
+}
+
+### Scrape Specific Category
+POST https://localhost:7001/api/scraper/scrape-category/Beverages
+Content-Type: application/json
+
+{
+  "email": "your-email@example.com",
+  "password": "your-password",
+  "headless": false,
+  "downloadImages": false,
+  "storeInMongoDB": true,
+  "outputFile": "beverages_products.json"
+}
+
+### Adams Food Service - Health Check
+GET https://localhost:7001/api/adams/health
+
+### Adams Food Service - Get Available Categories
+GET https://localhost:7001/api/adams/categories
+
+### Adams Food Service - Get Configuration
+GET https://localhost:7001/api/adams/config
+
+### Adams Food Service - Scrape All Categories (with MongoDB storage)
+POST https://localhost:7001/api/adams/scrape-all-categories
+Content-Type: application/json
+
+{
+  "headless": false,
+  "downloadImages": false,
+  "storeInMongoDB": true,
+  "outputFile": "adams_products.json"
+}
+
+### Adams Food Service - Scrape All Categories (without MongoDB storage - file only)
+POST https://localhost:7001/api/adams/scrape-all-categories
+Content-Type: application/json
+
+{
+  "headless": false,
+  "downloadImages": false,
+  "storeInMongoDB": false,
+  "outputFile": "adams_products.json"
+}
+
+### Adams Food Service - Scrape Specific Category
+POST https://localhost:7001/api/adams/scrape-category/Beverages
+Content-Type: application/json
+
+{
+  "headless": false,
+  "downloadImages": false,
+  "storeInMongoDB": true,
+  "outputFile": "beverages_products.json"
+}
+
+### Metro Scraper - Health Check
+GET https://localhost:7001/api/metroscraper/health
+
+### Metro Scraper - Get Available Categories
+GET https://localhost:7001/api/metroscraper/categories
+
+### Metro Scraper - Get Configuration
+GET https://localhost:7001/api/metroscraper/config
+
+### Metro Scraper - Scrape All Categories (with MongoDB storage)
+POST https://localhost:7001/api/metroscraper/scrape-all
+Content-Type: application/json
+
+{
+  "headless": false,
+  "downloadImages": false,
+  "storeInMongoDB": true,
+  "outputFile": "metro_products.json"
+}
+
+### Metro Scraper - Scrape All Categories (without MongoDB storage - file only)
+POST https://localhost:7001/api/metroscraper/scrape-all
+Content-Type: application/json
+
+{
+  "headless": false,
+  "downloadImages": false,
+  "storeInMongoDB": false,
+  "outputFile": "metro_products.json"
+}
+
+### Metro Scraper - Scrape Specific Category
+POST https://localhost:7001/api/metroscraper/scrape-category/Beverages
+Content-Type: application/json
+
+{
+  "headless": false,
+  "downloadImages": false,
+  "storeInMongoDB": true,
+  "outputFile": "metro_beverages_products.json"
+}
