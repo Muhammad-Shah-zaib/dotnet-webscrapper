@@ -5,7 +5,7 @@ namespace WebScrapperApi.Configuration
 {
     public static class MetroConfig
     {
-        public const string METRO_BASE_URL = "https://www.metro.co.uk/"; // Update as needed
+        public const string METRO_BASE_URL = "https://metrocashandcarryhull.com/";
 
         public static readonly List<Category> METRO_CATEGORIES = new List<Category>
         {

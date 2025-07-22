@@ -12,7 +12,7 @@ namespace WebScrapperApi.Models
 
         [Key]
         public string ProductId { get; set; } = string.Empty;
-        public string? ProductCode { get; set; } // Metro products don't have codes, keep for schema compatibility
+        public string? ProductCode { get; set; }
         public string? ProductName { get; set; }
         public string? ProductDescription { get; set; }
         public string? ProductSize { get; set; }

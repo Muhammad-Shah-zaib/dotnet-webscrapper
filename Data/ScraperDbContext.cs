@@ -57,7 +57,7 @@ namespace WebScrapperApi.Data
                 {
                     // Check if product already exists by product code and category
                     var filter = Builders<CaterChoiceProduct>.Filter.And(
-                        Builders<CaterChoiceProduct>.Filter.Eq(p => p.ProductCode, product.ProductCode),
+                        Builders<CaterChoiceProduct>.Filter.Eq(p => p.ProductName, product.ProductName),
                         Builders<CaterChoiceProduct>.Filter.Eq(p => p.Category, product.Category)
                     );
 
@@ -177,7 +177,7 @@ namespace WebScrapperApi.Data
                 {
                     // Check if product already exists by ProductId and Category
                     var filter = Builders<MetroProduct>.Filter.And(
-                        Builders<MetroProduct>.Filter.Eq(p => p.ProductId, product.ProductId),
+                        Builders<MetroProduct>.Filter.Eq(p => p.ProductName, product.ProductName),
                         Builders<MetroProduct>.Filter.Eq(p => p.Category, product.Category)
                     );
 
