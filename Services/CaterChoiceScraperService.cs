@@ -1,11 +1,14 @@
 
+using Microsoft.Extensions.Options;
+
 namespace WebScrapperApi.Services
 {
-    public class CaterChoiceScraperService(UtilityService utilityService, ILogger<CaterChoiceScraperService> logger, ScraperDbContext dbContext)
+    public class CaterChoiceScraperService(UtilityService utilityService, ILogger<CaterChoiceScraperService> logger, ScraperDbContext dbContext, IOptionsMonitor<ScraperCredentialsConfig> credentialsMonitor)
     {
         private readonly UtilityService _utilityService = utilityService;
         private readonly ILogger<CaterChoiceScraperService> _logger = logger;
         private readonly ScraperDbContext _dbContext = dbContext;
+        private readonly ScraperCredentialsConfig _credentials = credentialsMonitor.CurrentValue;
 
         public async Task<ScrapingResult> ScrapeAllCategoriesAsync(ScrapingOptions options)
         {
@@ -40,7 +43,6 @@ namespace WebScrapperApi.Services
             await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
             {
                 Headless = options.Headless,
-                SlowMo = 50,
                 Args = new[] { "--ignore-certificate-errors" }
             });
 
@@ -55,8 +57,6 @@ namespace WebScrapperApi.Services
                     {
                         var categoryProducts = await ScrapeCategoryAsync(new ScrapingOptions
                         {
-                            Email = options.Email,
-                            Password = options.Password,
                             Headless = options.Headless,
                             DownloadImages = options.DownloadImages,
                             StoreInMongoDB = options.StoreInMongoDB
@@ -197,10 +197,10 @@ namespace WebScrapperApi.Services
                 page = await context.NewPageAsync();
 
                 // Login if credentials provided
-                if (!string.IsNullOrEmpty(options.Email) && !string.IsNullOrEmpty(options.Password))
+                if (options.UseCredentials)
                 {
-                    _logger.LogInformation("Credentials provided, attempting login...");
-                    await LoginAsync(page, options.Email, options.Password);
+                    _logger.LogInformation("Using credentials, attempting login...");
+                    await LoginAsync(page, _credentials.Email, _credentials.Password);
                 }
                 else
                 {

@@ -5,14 +5,24 @@ namespace WebScrapperApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class MetroScraperController(MetroScraperService metroScraperService, ILogger<MetroScraperController> logger) : ControllerBase
+    public class MetroScraperController(MetroScraperService metroScraperService, ILogger<MetroScraperController> logger, ScraperLockService scraperLockService) : ControllerBase
     {
         private readonly MetroScraperService _metroScraperService = metroScraperService;
+        private readonly ScraperLockService _scraperLockService = scraperLockService;
         private readonly ILogger<MetroScraperController> _logger = logger;
 
-        [HttpPost("scrape-all")]
+        [HttpPost("scrape-all-categories")]
         public async Task<IActionResult> ScrapeAllCategories([FromBody] ScrapingOptions options)
         {
+            if (!_scraperLockService.TryStartScraping("Metro"))
+            {
+                return Conflict(new
+                {
+                    status = "error",
+                    message = $"Another scraper is already running: '{_scraperLockService.CurrentScraper}'"
+                });
+            }
+
             try
             {
                 _logger.LogInformation("Starting Metro scrape all categories request");
@@ -30,7 +40,12 @@ namespace WebScrapperApi.Controllers
                     error = ex.Message
                 });
             }
+            finally
+            {
+                _scraperLockService.StopScraping();
+            }
         }
+
 
         /// <summary>
         /// Scrape a specific category from Metro
@@ -41,6 +56,14 @@ namespace WebScrapperApi.Controllers
         [HttpPost("scrape-category/{categoryName}")]
         public async Task<IActionResult> ScrapeCategory(string categoryName, [FromBody] ScrapingOptions options)
         {
+            if (!_scraperLockService.TryStartScraping("Metro"))
+            {
+                return Conflict(new
+                {
+                    status = "error",
+                    message = $"Another scraper is already running: '{_scraperLockService.CurrentScraper}'"
+                });
+            }
             try
             {
                 _logger.LogInformation("Starting Metro scrape category request for: {CategoryName}", categoryName);
@@ -80,6 +103,10 @@ namespace WebScrapperApi.Controllers
                     message = "An error occurred during Metro scraping",
                     error = ex.Message
                 });
+            }
+            finally
+            {
+                _scraperLockService.StopScraping();
             }
         }
 

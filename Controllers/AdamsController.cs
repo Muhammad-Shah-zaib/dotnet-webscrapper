@@ -7,10 +7,11 @@ namespace WebScrapperApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class AdamsController(AdamsScraperService adamsScraperService, ILogger<AdamsController> logger) : ControllerBase
+    public class AdamsController(AdamsScraperService adamsScraperService, ILogger<AdamsController> logger,  ScraperLockService scraperLockService ) : ControllerBase
     {
         private readonly AdamsScraperService _adamsScraperService = adamsScraperService;
         private readonly ILogger<AdamsController> _logger = logger;
+        private readonly ScraperLockService _scraperLockService = scraperLockService;
 
         /// <summary>
         /// Scrape all categories from Adams Food Service
@@ -20,15 +21,24 @@ namespace WebScrapperApi.Controllers
         [HttpPost("scrape-all-categories")]
         public async Task<IActionResult> ScrapeAllCategories([FromBody] ScrapingOptions options)
         {
+            if (!_scraperLockService.TryStartScraping("Adams"))
+            {
+                return Conflict(new
+                {
+                    status = "error",
+                    message = $"Another scraper is already running: '{_scraperLockService.CurrentScraper}'"
+                });
+            }
+
             try
             {
                 _logger.LogInformation("Starting Adams scrape all categories request");
-                
+
                 var result = await _adamsScraperService.ScrapeAllCategoriesAsync(options);
-                
+
                 _logger.LogInformation("Adams scrape all categories completed successfully. Total products: {TotalProducts}", 
                     result.TotalProducts);
-                
+
                 return Ok(result);
             }
             catch (Exception ex)
@@ -41,7 +51,12 @@ namespace WebScrapperApi.Controllers
                     error = ex.Message
                 });
             }
+            finally
+            {
+                _scraperLockService.StopScraping();
+            }
         }
+
 
         /// <summary>
         /// Scrape a specific category from Adams Food Service
@@ -52,11 +67,19 @@ namespace WebScrapperApi.Controllers
         [HttpPost("scrape-category/{categoryName}")]
         public async Task<IActionResult> ScrapeCategory(string categoryName, [FromBody] ScrapingOptions options)
         {
+            if (!_scraperLockService.TryStartScraping("Adams"))
+            {
+                return Conflict(new
+                {
+                    status = "error",
+                    message = $"Another scraper is already running: '{_scraperLockService.CurrentScraper}'"
+                });
+            }
+
             try
             {
                 _logger.LogInformation("Starting Adams scrape category request for: {CategoryName}", categoryName);
 
-                // Find the category by name
                 var category = AdamsConfig.ADAMS_CATEGORIES
                     .FirstOrDefault(c => string.Equals(c.Name, categoryName, StringComparison.OrdinalIgnoreCase));
 
@@ -71,16 +94,16 @@ namespace WebScrapperApi.Controllers
                 }
 
                 var products = await _adamsScraperService.ScrapeCategoryAsync(options, category);
-                
+
                 _logger.LogInformation("Adams scrape category completed successfully. Products found: {ProductCount}", 
                     products.Count);
-                
+
                 return Ok(new
                 {
                     status = "success",
                     category = categoryName,
                     total_products = products.Count,
-                    products = products,
+                    products,
                     timestamp = DateTime.UtcNow
                 });
             }
@@ -94,7 +117,12 @@ namespace WebScrapperApi.Controllers
                     error = ex.Message
                 });
             }
+            finally
+            {
+                _scraperLockService.StopScraping();
+            }
         }
+
 
         /// <summary>
         /// Get available categories for Adams scraping
@@ -114,7 +142,7 @@ namespace WebScrapperApi.Controllers
                 return Ok(new
                 {
                     status = "success",
-                    categories = categories,
+                    categories,
                     total_categories = categories.Count
                 });
             }

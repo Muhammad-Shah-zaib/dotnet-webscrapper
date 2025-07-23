@@ -15,8 +15,15 @@ builder.Services.AddScoped<AdamsScraperService>();
 builder.Services.AddScoped<UtilityService>();
 builder.Services.AddScoped<MetroScraperService>();
 
+// singleton Scrapper Lock So only one Scrapper runs at a time
+builder.Services.AddSingleton<ScraperLockService> ();
+
 // Register database context
 builder.Services.AddScoped<ScraperDbContext>();
+
+// Scraper credentials Config
+builder.Services.Configure<ScraperCredentialsConfig>(
+    builder.Configuration.GetSection("ScraperCredentials"));
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

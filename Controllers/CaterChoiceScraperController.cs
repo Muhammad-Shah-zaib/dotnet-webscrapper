@@ -6,9 +6,10 @@ namespace WebScrapperApi.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class CaterChoiceScraperController(CaterChoiceScraperService scraperService, ILogger<CaterChoiceScraperController> logger) : ControllerBase
+    public class CaterChoiceScraperController(CaterChoiceScraperService scraperService, ILogger<CaterChoiceScraperController> logger, ScraperLockService scraperLockService) : ControllerBase
     {
         private readonly CaterChoiceScraperService _scraperService = scraperService;
+        private readonly ScraperLockService _scraperLockService = scraperLockService;
         private readonly ILogger<CaterChoiceScraperController> _logger = logger;
 
         /// <summary>
@@ -19,15 +20,23 @@ namespace WebScrapperApi.Controllers
         [HttpPost("scrape-all-categories")]
         public async Task<IActionResult> ScrapeAllCategories([FromBody] ScrapingOptions options)
         {
+            if (!_scraperLockService.TryStartScraping("CaterChoice"))
+            {
+                return Conflict(new
+                {
+                    status = "error",
+                    message = $"Another scraper is already running: '{_scraperLockService.CurrentScraper}'"
+                });
+            }
             try
             {
                 _logger.LogInformation("Starting scrape all categories request");
-                
+
                 var result = await _scraperService.ScrapeAllCategoriesAsync(options);
-                
-                _logger.LogInformation("Scrape all categories completed successfully. Total products: {TotalProducts}", 
+
+                _logger.LogInformation("Scrape all categories completed successfully. Total products: {TotalProducts}",
                     result.TotalProducts);
-                
+
                 return Ok(result);
             }
             catch (Exception ex)
@@ -40,6 +49,10 @@ namespace WebScrapperApi.Controllers
                     error = ex.Message
                 });
             }
+            finally
+            {
+                _scraperLockService.StopScraping();
+            }
         }
 
         /// <summary>
@@ -51,6 +64,15 @@ namespace WebScrapperApi.Controllers
         [HttpPost("scrape-category/{categoryName}")]
         public async Task<IActionResult> ScrapeCategory(string categoryName, [FromBody] ScrapingOptions options)
         {
+            if (!_scraperLockService.TryStartScraping("CaterChoice"))
+            {
+                return Conflict(new
+                {
+                    status = "error",
+                    message = $"Another scraper is already running: '{_scraperLockService.CurrentScraper}'"
+                });
+            }
+
             try
             {
                 _logger.LogInformation("Starting scrape category request for: {CategoryName}", categoryName);
@@ -70,10 +92,10 @@ namespace WebScrapperApi.Controllers
                 }
 
                 var products = await _scraperService.ScrapeCategoryAsync(options, category);
-                
-                _logger.LogInformation("Scrape category completed successfully. Products found: {ProductCount}", 
+
+                _logger.LogInformation("Scrape category completed successfully. Products found: {ProductCount}",
                     products.Count);
-                
+
                 return Ok(new
                 {
                     status = "success",
@@ -92,6 +114,10 @@ namespace WebScrapperApi.Controllers
                     message = "An error occurred during scraping",
                     error = ex.Message
                 });
+            }
+            finally
+            {
+                _scraperLockService.StopScraping();
             }
         }
 
