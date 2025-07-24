@@ -3,6 +3,9 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
+# local storage json obejcts
+LocalStorage/
+
 # dotenv files
 .env
 

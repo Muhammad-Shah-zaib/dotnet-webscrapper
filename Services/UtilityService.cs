@@ -13,16 +13,17 @@ namespace WebScrapperApi.Services
             try
             {
                 var json = JsonConvert.SerializeObject(data, Formatting.Indented);
-                var filePath = Path.Combine(_environment.ContentRootPath, filename);
-                
-                // Ensure directory exists
-                var directory = Path.GetDirectoryName(filePath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+
+                var folderPath = Path.Combine(_environment.ContentRootPath, "LocalStorage");
+
+                if (!Directory.Exists(folderPath))
                 {
-                    Directory.CreateDirectory(directory);
+                    Directory.CreateDirectory(folderPath);
                 }
 
+                var filePath = Path.Combine(folderPath, filename);
                 File.WriteAllText(filePath, json);
+
                 return filePath;
             }
             catch (Exception ex)
@@ -30,6 +31,7 @@ namespace WebScrapperApi.Services
                 throw new Exception($"Failed to save JSON file: {ex.Message}");
             }
         }
+
 
         public async Task<ImageDownloadResult?> DownloadImageAsync(string imageUrl, string productNameHash, string folderPath)
         {
