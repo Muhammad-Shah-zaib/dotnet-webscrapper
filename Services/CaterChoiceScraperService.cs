@@ -6,7 +6,6 @@ namespace WebScrapperApi.Services
     public class CaterChoiceScraperService(UtilityService utilityService, ILogger<CaterChoiceScraperService> logger, ScraperDbContext dbContext, IOptionsMonitor<ScraperCredentialsConfig> credentialsMonitor)
     {
         private readonly UtilityService _utilityService = utilityService;
-        private readonly ILogger<CaterChoiceScraperService> _logger = logger;
         private readonly ScraperDbContext _dbContext = dbContext;
         private readonly ScraperCredentialsConfig _credentials = credentialsMonitor.CurrentValue;
 
@@ -25,17 +24,17 @@ namespace WebScrapperApi.Services
                 {
                     await _dbContext.ConnectAsync();
                     mongoEnabled = true;
-                    _logger.LogInformation("MongoDB connection established using ScraperDbContext");
+                    logger.LogInformation("MongoDB connection established using ScraperDbContext");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to connect to MongoDB. Proceeding without database integration.");
+                    logger.LogError(ex, "Failed to connect to MongoDB. Proceeding without database integration.");
                     mongoEnabled = false;
                 }
             }
             else
             {
-                _logger.LogInformation("MongoDB storage disabled by user preference");
+                logger.LogInformation("MongoDB storage disabled by user preference");
             }
 
             // Initialize Playwright
@@ -51,13 +50,17 @@ namespace WebScrapperApi.Services
                 // Process each category
                 foreach (var category in CaterChoiceConfig.CATER_CHOICE_CATEGORIES)
                 {
-                    _logger.LogInformation("Processing category: {CategoryName}", category.Name);
+                    logger.LogInformation("Processing category: {CategoryName}", category.Name);
 
                     try
                     {
                         var categoryProducts = await ScrapeCategoryAsync(new ScrapingOptions
                         {
+                            Email = options.Email,
+                            Password = options.Password,
                             Headless = options.Headless,
+                            UseCredentials = options.UseCredentials,
+                            OutputFile =  options.OutputFile,
                             DownloadImages = options.DownloadImages,
                             StoreInMongoDB = options.StoreInMongoDB
                         }, category, browser);
@@ -82,7 +85,7 @@ namespace WebScrapperApi.Services
                     }
                     catch ( Exception ex)
                     {
-                        _logger.LogError(ex, "Error scraping category {CategoryName}", category.Name);
+                        logger.LogError(ex, "Error scraping category {CategoryName}", category.Name);
                         statistics.Errors++;
                     }
                 }
@@ -130,15 +133,15 @@ namespace WebScrapperApi.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during scraping process");
+                logger.LogError(ex, "Error during scraping process");
                 throw;
             }
         }
 
         public async Task<List<CaterChoiceProduct>> ScrapeCategoryAsync(ScrapingOptions options, Category category, IBrowser? existingBrowser = null)
         {
-            _logger.LogInformation("Starting to scrape Cater Choice category: {CategoryName}", category.Name);
-            _logger.LogInformation("Category URL: {CategoryUrl}", category.Url);
+            logger.LogInformation("Starting to scrape Cater Choice category: {CategoryName}", category.Name);
+            logger.LogInformation("Category URL: {CategoryUrl}", category.Url);
 
             var startTime = DateTime.UtcNow;
             var products = new List<CaterChoiceProduct>();
@@ -154,14 +157,8 @@ namespace WebScrapperApi.Services
             {
                 password = options.Password;
             }
-            logger.LogCritical("-------------------------");
-            logger.LogCritical("-------------------------");
-            logger.LogCritical("-------------------------");
-            logger.LogCritical(email);
-            logger.LogCritical(password);
-            logger.LogCritical("-------------------------");
-            logger.LogCritical("-------------------------");
-            logger.LogCritical("-------------------------");
+
+
 
             // MongoDB setup
             var mongoEnabled = false;
@@ -172,17 +169,17 @@ namespace WebScrapperApi.Services
                 {
                     await _dbContext.ConnectAsync();
                     mongoEnabled = true;
-                    _logger.LogInformation("MongoDB connection established using ScraperDbContext");
+                    logger.LogInformation("MongoDB connection established using ScraperDbContext");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to connect to MongoDB. Proceeding without database integration.");
+                    logger.LogError(ex, "Failed to connect to MongoDB. Proceeding without database integration.");
                     mongoEnabled = false;
                 }
             }
             else
             {
-                _logger.LogInformation("MongoDB storage disabled by user preference");
+                logger.LogInformation("MongoDB storage disabled by user preference");
             }
 
             IBrowser? browser = null;
@@ -219,21 +216,23 @@ namespace WebScrapperApi.Services
                 // Login if credentials provided
                 if (options.UseCredentials)
                 {
-                    _logger.LogInformation("Using credentials, attempting login...");
+                    logger.LogCritical(email);
+                    logger.LogCritical(password);
+                    logger.LogInformation("Using credentials, attempting login...");
                     await LoginAsync(page, email, password);
                 }
                 else
                 {
-                    _logger.LogInformation("No credentials provided, skipping login");
+                    logger.LogInformation("No credentials provided, skipping login");
                 }
 
                 // Navigate to category page
-                _logger.LogInformation("Navigating to category URL: {CategoryUrl}", category.Url);
+                logger.LogInformation("Navigating to category URL: {CategoryUrl}", category.Url);
                 await page.GotoAsync(category.Url, new PageGotoOptions { Timeout = 60000 });
 
                 // Wait for the page to fully load
                 await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 30000 });
-                _logger.LogInformation("Page fully loaded");
+                logger.LogInformation("Page fully loaded");
 
                 // Take a screenshot of the category page for debugging
                 var screenshotDir = Path.Combine("screenshots", "caterchoice");
@@ -244,15 +243,15 @@ namespace WebScrapperApi.Services
                     Path = screenshotPath, 
                     FullPage = true 
                 });
-                _logger.LogInformation("Category page screenshot saved as {ScreenshotPath}", screenshotPath);
+                logger.LogInformation("Category page screenshot saved as {ScreenshotPath}", screenshotPath);
 
                 // Extract products from current page
-                _logger.LogInformation("Extracting products from current page...");
+                logger.LogInformation("Extracting products from current page...");
                 var pageProducts = await ExtractProductsFromPageAsync(page, category.Name, options.DownloadImages);
 
                 // Filter out "Unknown Product" entries
                 var validProducts = pageProducts.Where(p => p.ProductName != "Unknown Product").ToList();
-                _logger.LogInformation("Found {TotalProducts} products, {ValidProducts} valid products after filtering", 
+                logger.LogInformation("Found {TotalProducts} products, {ValidProducts} valid products after filtering",
                     pageProducts.Count, validProducts.Count);
 
                 products.AddRange(validProducts);
@@ -260,37 +259,37 @@ namespace WebScrapperApi.Services
                 // Pagination logic: click next page and scrape recursively
                 while (true)
                 {
-                    _logger.LogInformation("Checking for next page...");
+                    logger.LogInformation("Checking for next page...");
                     var nextPageButton = await page.QuerySelectorAsync("ul.pagination li.page-item:not(.disabled) > a.page-link:has-text(\"›\")");
                     if (nextPageButton != null)
                     {
-                        _logger.LogInformation("Next page button found, clicking to go to next page...");
+                        logger.LogInformation("Next page button found, clicking to go to next page...");
                         await nextPageButton.ClickAsync(new ElementHandleClickOptions { Force = true });
                         await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 30000 });
-                        _logger.LogInformation("Next page loaded, extracting products...");
+                        logger.LogInformation("Next page loaded, extracting products...");
                         var nextPageProducts = await ExtractProductsFromPageAsync(page, category.Name, options.DownloadImages);
                         var nextValidProducts = nextPageProducts.Where(p => p.ProductName != "Unknown Product").ToList();
-                        _logger.LogInformation("Found {TotalProducts} products, {ValidProducts} valid products after filtering on next page", 
+                        logger.LogInformation("Found {TotalProducts} products, {ValidProducts} valid products after filtering on next page",
                             nextPageProducts.Count, nextValidProducts.Count);
                         products.AddRange(nextValidProducts);
                     }
                     else
                     {
-                        _logger.LogInformation("No next page button found, finished pagination.");
+                        logger.LogInformation("No next page button found, finished pagination.");
                         break;
                     }
                 }
 
-                _logger.LogInformation("Finished scraping category {CategoryName}, found {ProductCount} valid products total", 
+                logger.LogInformation("Finished scraping category {CategoryName}, found {ProductCount} valid products total",
                     category.Name, products.Count);
 
                 // Save to MongoDB if enabled
                 MongoStats mongoStats = new();
                 if (mongoEnabled && products.Count > 0)
                 {
-                    _logger.LogInformation("Saving {ProductCount} products to MongoDB...", products.Count);
+                    logger.LogInformation("Saving {ProductCount} products to MongoDB...", products.Count);
                     mongoStats = await _dbContext.SaveCaterChoiceProductsAsync(products);
-                    _logger.LogInformation("MongoDB stats: {Stats}", System.Text.Json.JsonSerializer.Serialize(mongoStats));
+                    logger.LogInformation("MongoDB stats: {Stats}", System.Text.Json.JsonSerializer.Serialize(mongoStats));
                 }
 
                 // If this is a standalone category scrape (not part of scrapeAllCategories)
@@ -298,7 +297,7 @@ namespace WebScrapperApi.Services
                 {
                     var endTime = DateTime.UtcNow;
                     var processingTimeSeconds = (endTime - startTime).TotalSeconds;
-                    _logger.LogInformation("Processing completed in {ProcessingTime} seconds", processingTimeSeconds);
+                    logger.LogInformation("Processing completed in {ProcessingTime} seconds", processingTimeSeconds);
 
                     var statistics = new ScrapingStatistics
                     {
@@ -313,7 +312,7 @@ namespace WebScrapperApi.Services
                     };
 
                     // Save results to file
-                    _logger.LogInformation("Saving results to file: {OutputFile}", options.OutputFile);
+                    logger.LogInformation("Saving results to file: {OutputFile}", options.OutputFile);
                     var outputPath = _utilityService.SaveToJson(new
                     {
                         products,
@@ -327,14 +326,14 @@ namespace WebScrapperApi.Services
                             statistics,
                         }
                     }, options.OutputFile);
-                    _logger.LogInformation("Results saved to: {OutputPath}", outputPath);
+                    logger.LogInformation("Results saved to: {OutputPath}", outputPath);
 
                     // Disconnect from MongoDB if connected
                     if (mongoEnabled)
                     {
-                        _logger.LogInformation("Disconnecting from MongoDB...");
+                        logger.LogInformation("Disconnecting from MongoDB...");
                         _dbContext.Disconnect();
-                        _logger.LogInformation("MongoDB disconnected");
+                        logger.LogInformation("MongoDB disconnected");
                     }
                 }
 
@@ -342,7 +341,7 @@ namespace WebScrapperApi.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error scraping category {CategoryName}", category.Name);
+                logger.LogError(ex, "Error scraping category {CategoryName}", category.Name);
                 throw;
             }
             finally
@@ -359,27 +358,27 @@ namespace WebScrapperApi.Services
 
                 if (mongoEnabled && !string.IsNullOrEmpty(options.OutputFile))
                 {
-                    _logger.LogInformation("Disconnecting from MongoDB...");
+                    logger.LogInformation("Disconnecting from MongoDB...");
                     _dbContext.Disconnect();
-                    _logger.LogInformation("MongoDB disconnected");
+                    logger.LogInformation("MongoDB disconnected");
                 }
             }
         }
 
         private async Task<List<CaterChoiceProduct>> ExtractProductsFromPageAsync(IPage page, string categoryName, bool downloadImages)
         {
-            _logger.LogInformation("Extracting products from page for category: {CategoryName}", categoryName);
+            logger.LogInformation("Extracting products from page for category: {CategoryName}", categoryName);
             var products = new List<CaterChoiceProduct>();
 
             // wait for main product grid to load
             try
             {
                 await page.WaitForSelectorAsync(CaterChoiceConfig.CaterChoiceSelectors.PRODUCT_GRID, new PageWaitForSelectorOptions { Timeout = 10000 });
-                _logger.LogInformation("Main product Grid found");
+                logger.LogInformation("Main product Grid found");
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error waiting for main product grid to load, continuing with product extraction");
+                logger.LogError(ex, "Error waiting for main product grid to load, continuing with product extraction");
             }            
 
             // Try to find product containers using multiple selectors
@@ -397,26 +396,26 @@ namespace WebScrapperApi.Services
             {
                 try
                 {
-                    _logger.LogInformation("Trying product container selector: {Selector}", selector);
+                    logger.LogInformation("Trying product container selector: {Selector}", selector);
                     await page.WaitForSelectorAsync(selector, new PageWaitForSelectorOptions { Timeout = 10000 });
                     productElements = (await page.QuerySelectorAllAsync(selector)).ToArray();
                     if (productElements.Length > 0)
                     {
-                        _logger.LogInformation("Found {Count} product containers using selector: {Selector}", 
+                        logger.LogInformation("Found {Count} product containers using selector: {Selector}",
                             productElements.Length, selector);
                         break;
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning("Selector {Selector} failed: {Error}", selector, ex.Message);
+                    logger.LogWarning("Selector {Selector} failed: {Error}", selector, ex.Message);
                 }
             }
 
             // If still no products found, try XPath as last resort
             if (productElements == null || productElements.Length == 0)
             {
-                _logger.LogInformation("Trying XPath selector as last resort...");
+                logger.LogInformation("Trying XPath selector as last resort...");
                 try
                 {
                     var xpathElements = await page.Locator(CaterChoiceConfig.CaterChoiceSelectors.PRODUCT_ITEM_XPATH).AllAsync();
@@ -425,35 +424,35 @@ namespace WebScrapperApi.Services
                         productElements = (await Task.WhenAll(xpathElements.Select(e => e.ElementHandleAsync())))
                         .Where(e => e != null)
                         .ToArray();
-                        _logger.LogInformation("Found {Count} products using XPath", productElements.Length);
+                        logger.LogInformation("Found {Count} products using XPath", productElements.Length);
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning("XPath selector failed: {Error}", ex.Message);
+                    logger.LogWarning("XPath selector failed: {Error}", ex.Message);
                 }
             }
 
             if (productElements == null || productElements.Length == 0)
             {
-                _logger.LogWarning("No product elements found, saving page content for debugging...");
+                logger.LogWarning("No product elements found, saving page content for debugging...");
                 var pageContent = await page.ContentAsync();
                 var debugDir = Path.Combine("screenshots", "caterchoice");
                 Directory.CreateDirectory(debugDir);
                 var debugFilePath = Path.Combine(debugDir, $"caterchoice-{categoryName}-debug.html");
                 await File.WriteAllTextAsync(debugFilePath, pageContent);
-                _logger.LogInformation("Debug HTML saved to {FilePath}", debugFilePath);
+                logger.LogInformation("Debug HTML saved to {FilePath}", debugFilePath);
                 return products;
             }
 
-            _logger.LogInformation("Processing {Count} product elements", productElements.Length);
+            logger.LogInformation("Processing {Count} product elements", productElements.Length);
 
             for (int i = 0; i < productElements.Length; i++)
             {
                 var productElement = productElements[i];
                 try
                 {
-                    _logger.LogInformation("Processing product {Index} of {Total}", i + 1, productElements.Length);
+                    logger.LogInformation("Processing product {Index} of {Total}", i + 1, productElements.Length);
 
                     // Extract product details using updated selectors
                     var name = "Unknown Product";
@@ -483,12 +482,12 @@ namespace WebScrapperApi.Services
                                 url = await nameElement.GetAttributeAsync("href") ?? "";
                                 if (!string.IsNullOrEmpty(name) && name != "Unknown Product")
                                 {
-                                    _logger.LogInformation("Found name: {Name}", name);
+                                    logger.LogInformation("Found name: {Name}", name);
                                     if (!string.IsNullOrEmpty(url) && !url.StartsWith("http"))
                                     {
                                         url = $"{CaterChoiceConfig.CATER_CHOICE_BASE_URL.TrimEnd('/')}{url}";
                                     }
-                                    _logger.LogInformation("Found URL: {Url}", url);
+                                    logger.LogInformation("Found URL: {Url}", url);
                                     break;
                                 }
                             }
@@ -501,7 +500,7 @@ namespace WebScrapperApi.Services
 
                     if (string.IsNullOrEmpty(name) || name == "Unknown Product")
                     {
-                        _logger.LogInformation("Skipping product {Index}: no valid name found.", i + 1);
+                        logger.LogInformation("Skipping product {Index}: no valid name found.", i + 1);
                         continue;
                     }
 
@@ -524,7 +523,7 @@ namespace WebScrapperApi.Services
                                 imageUrl = await imageElement.GetAttributeAsync("src") ?? "";
                                 if (!string.IsNullOrEmpty(imageUrl))
                                 {
-                                    _logger.LogInformation("Found image URL: {ImageUrl}...", 
+                                    logger.LogInformation("Found image URL: {ImageUrl}...",
                                         imageUrl.Length > 50 ? imageUrl.Substring(0, 50) : imageUrl);
                                     break;
                                 }
@@ -555,7 +554,7 @@ namespace WebScrapperApi.Services
                                 packSize = await packSizeElement.TextContentAsync() ?? "";
                                 if (!string.IsNullOrEmpty(packSize))
                                 {
-                                    _logger.LogInformation("Found pack size: {PackSize}", packSize);
+                                    logger.LogInformation("Found pack size: {PackSize}", packSize);
                                     break;
                                 }
                             }
@@ -585,7 +584,7 @@ namespace WebScrapperApi.Services
                                 casePrice = await casePriceElement.TextContentAsync() ?? "";
                                 if (!string.IsNullOrEmpty(casePrice))
                                 {
-                                    _logger.LogInformation("Found case price: {CasePrice}", casePrice);
+                                    logger.LogInformation("Found case price: {CasePrice}", casePrice);
                                     break;
                                 }
                             }
@@ -615,7 +614,7 @@ namespace WebScrapperApi.Services
                                 singlePrice = await singlePriceElement.TextContentAsync() ?? "";
                                 if (!string.IsNullOrEmpty(singlePrice))
                                 {
-                                    _logger.LogInformation("Found single price: {SinglePrice}", singlePrice);
+                                    logger.LogInformation("Found single price: {SinglePrice}", singlePrice);
                                     break;
                                 }
                             }
@@ -636,17 +635,17 @@ namespace WebScrapperApi.Services
 
                     if (downloadImages && !string.IsNullOrEmpty(imageUrl))
                     {
-                        _logger.LogInformation("Downloading image for product: {Name}", name);
+                        logger.LogInformation("Downloading image for product: {Name}", name);
                         var imageResult = await _utilityService.DownloadImageAsync(imageUrl, productNameHash, "images/cater-choice");
                         if (imageResult != null)
                         {
                             localImageFilename = imageResult.Filename;
                             localImageFilepath = imageResult.FilePath;
-                            _logger.LogInformation("Image downloaded: {Filename}", localImageFilename);
+                            logger.LogInformation("Image downloaded: {Filename}", localImageFilename);
                         }
                         else
                         {
-                            _logger.LogWarning("Failed to download image");
+                            logger.LogWarning("Failed to download image");
                         }
                     }
 
@@ -658,11 +657,11 @@ namespace WebScrapperApi.Services
                     {
                         try
                         {
-                            _logger.LogInformation("Visiting product page for code/description: {Url}", url);
+                            logger.LogInformation("Visiting product page for code/description: {Url}", url);
                             var productPage = await page.Context.NewPageAsync();
                             await productPage.GotoAsync(url, new PageGotoOptions { Timeout = 30000 });
                             await productPage.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 15000 });
-                            _logger.LogInformation("Product page loaded");
+                            logger.LogInformation("Product page loaded");
 
                             // Product Code - try multiple selectors
                             var codeSelectors = new[]
@@ -685,7 +684,7 @@ namespace WebScrapperApi.Services
                                         productCode = fullText.Replace("Product Code:", "").Replace(" ", "").Trim();
                                         if (!string.IsNullOrEmpty(productCode))
                                         {
-                                            _logger.LogInformation("Found product code: {ProductCode}", productCode);
+                                            logger.LogInformation("Found product code: {ProductCode}", productCode);
                                             break;
                                         }
                                     }
@@ -715,7 +714,7 @@ namespace WebScrapperApi.Services
                                         productDescription = await descElement.TextContentAsync() ?? "";
                                         if (!string.IsNullOrEmpty(productDescription))
                                         {
-                                            _logger.LogInformation("Found product description: {Description}...", 
+                                            logger.LogInformation("Found product description: {Description}...",
                                                 productDescription.Length > 50 ? productDescription.Substring(0, 50) : productDescription);
                                             break;
                                         }
@@ -728,11 +727,11 @@ namespace WebScrapperApi.Services
                             }
 
                             await productPage.CloseAsync();
-                            _logger.LogInformation("Product page closed");
+                            logger.LogInformation("Product page closed");
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "Error visiting product page {Url}", url);
+                            logger.LogError(ex, "Error visiting product page {Url}", url);
                         }
                     }
 
@@ -756,39 +755,39 @@ namespace WebScrapperApi.Services
                     };
 
                     products.Add(product);
-                    _logger.LogInformation("Product {Name} added to results", name);
+                    logger.LogInformation("Product {Name} added to results", name);
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error extracting product {Index}", i + 1);
+                    logger.LogError(ex, "Error extracting product {Index}", i + 1);
                 }
             }
 
-            _logger.LogInformation("Extracted {Count} products from page", products.Count);
+            logger.LogInformation("Extracted {Count} products from page", products.Count);
             return products;
         }
 
         private async Task LoginAsync(IPage page, string email, string password)
         {
-            _logger.LogInformation("Starting login process for Cater Choice...");
+            logger.LogInformation("Starting login process for Cater Choice...");
 
             try
             {
                 var loginUrl = $"{CaterChoiceConfig.CATER_CHOICE_BASE_URL.TrimEnd('/')}/customer/login";
-                _logger.LogInformation("Navigating to {LoginUrl}", loginUrl);
+                logger.LogInformation("Navigating to {LoginUrl}", loginUrl);
                 await page.GotoAsync(loginUrl);
 
                 // Wait for page to fully load
-                _logger.LogInformation("Waiting for page to fully load...");
+                logger.LogInformation("Waiting for page to fully load...");
                 await page.WaitForLoadStateAsync(LoadState.NetworkIdle);
 
-                _logger.LogInformation("Waiting for login form to load...");
+                logger.LogInformation("Waiting for login form to load...");
                 await page.WaitForSelectorAsync("input[type=\"email\"]", new PageWaitForSelectorOptions { Timeout = 30000 });
 
-                _logger.LogInformation("Filling email: {Email}...", email.Substring(0, Math.Min(3, email.Length)));
+                logger.LogInformation("Filling email: {Email}...", email.Substring(0, Math.Min(3, email.Length)));
                 await page.FillAsync("input[type=\"email\"]", email);
 
-                _logger.LogInformation("Filling password: ********");
+                logger.LogInformation("Filling password: ********");
                 await page.FillAsync("input[type=\"password\"]", password);
 
                 // Take a screenshot of the login form for debugging
@@ -796,13 +795,13 @@ namespace WebScrapperApi.Services
                 Directory.CreateDirectory(loginScreenshotDir);
                 var loginScreenshotPath = Path.Combine(loginScreenshotDir, "login-form.png");
                 await page.ScreenshotAsync(new PageScreenshotOptions { Path = loginScreenshotPath, FullPage = true });
-                _logger.LogInformation("Login form screenshot saved as {LoginScreenshotPath}", loginScreenshotPath);
+                logger.LogInformation("Login form screenshot saved as {LoginScreenshotPath}", loginScreenshotPath);
 
                 // Try multiple strategies to click the login button
-                _logger.LogInformation("Attempting to click login button using multiple strategies...");
+                logger.LogInformation("Attempting to click login button using multiple strategies...");
 
                 // Strategy 1: Use locator with XPath
-                _logger.LogInformation("Strategy 1: Using XPath with locator");
+                logger.LogInformation("Strategy 1: Using XPath with locator");
                 try
                 {
                     var buttonByXPath = page.Locator("xpath=/html/body/main/div[2]/div/div/form/button");
@@ -810,31 +809,31 @@ namespace WebScrapperApi.Services
 
                     if (isVisible)
                     {
-                        _logger.LogInformation("Button found by XPath, attempting to click...");
+                        logger.LogInformation("Button found by XPath, attempting to click...");
                         await buttonByXPath.ClickAsync(new LocatorClickOptions { Force = true, Timeout = 5000 });
-                        _logger.LogInformation("Button clicked using XPath");
+                        logger.LogInformation("Button clicked using XPath");
 
                         // Check if we've navigated away from the login page
                         await page.WaitForTimeoutAsync(2000);
                         var currentUrl = page.Url;
                         if (!currentUrl.Contains("login"))
                         {
-                            _logger.LogInformation("Login successful, URL changed to: {Url}", currentUrl);
+                            logger.LogInformation("Login successful, URL changed to: {Url}", currentUrl);
                             return; // Exit early if login was successful
                         }
                     }
                     else
                     {
-                        _logger.LogInformation("Button not visible or not found by XPath");
+                        logger.LogInformation("Button not visible or not found by XPath");
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning("XPath strategy failed: {Error}", ex.Message);
+                    logger.LogWarning("XPath strategy failed: {Error}", ex.Message);
                 }
 
                 // Strategy 2: Try submitting the form directly
-                _logger.LogInformation("Strategy 2: Submitting form directly");
+                logger.LogInformation("Strategy 2: Submitting form directly");
                 try
                 {
                     var submitted = await page.EvaluateAsync<bool>(@"
@@ -849,29 +848,29 @@ namespace WebScrapperApi.Services
                     ");
                     if (submitted)
                     {
-                        _logger.LogInformation("Form submitted directly");
+                        logger.LogInformation("Form submitted directly");
 
                         // Check if we've navigated away from the login page
                         await page.WaitForTimeoutAsync(2000);
                         var currentUrl = page.Url;
                         if (!currentUrl.Contains("login"))
                         {
-                            _logger.LogInformation("Login successful, URL changed to: {Url}", currentUrl);
+                            logger.LogInformation("Login successful, URL changed to: {Url}", currentUrl);
                             return; // Exit early if login was successful
                         }
                     }
                     else
                     {
-                        _logger.LogInformation("No form found to submit");
+                        logger.LogInformation("No form found to submit");
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning("Form submission failed: {Error}", ex.Message);
+                    logger.LogWarning("Form submission failed: {Error}", ex.Message);
                 }
 
                 // Strategy 3: Try various CSS selectors
-                _logger.LogInformation("Strategy 3: Trying various CSS selectors");
+                logger.LogInformation("Strategy 3: Trying various CSS selectors");
                 var selectors = new[]
                 {
                     "button[type=\"submit\"]",
@@ -888,22 +887,22 @@ namespace WebScrapperApi.Services
                 {
                     try
                     {
-                        _logger.LogInformation("Trying selector: {Selector}", selector);
+                        logger.LogInformation("Trying selector: {Selector}", selector);
                         var button = page.Locator(selector);
                         var isVisible = await button.IsVisibleAsync();
 
                         if (isVisible)
                         {
-                            _logger.LogInformation("Button found with selector: {Selector}", selector);
+                            logger.LogInformation("Button found with selector: {Selector}", selector);
                             await button.ClickAsync(new LocatorClickOptions { Force = true, Timeout = 5000 });
-                            _logger.LogInformation("Button clicked using selector: {Selector}", selector);
+                            logger.LogInformation("Button clicked using selector: {Selector}", selector);
 
                             // Check if we've navigated away from the login page
                             await page.WaitForTimeoutAsync(2000);
                             var currentUrl = page.Url;
                             if (!currentUrl.Contains("login"))
                             {
-                                _logger.LogInformation("Login successful, URL changed to: {Url}", currentUrl);
+                                logger.LogInformation("Login successful, URL changed to: {Url}", currentUrl);
                                 return; // Exit early if login was successful
                             }
 
@@ -912,55 +911,55 @@ namespace WebScrapperApi.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogWarning("Selector {Selector} failed: {Error}", selector, ex.Message);
+                        logger.LogWarning("Selector {Selector} failed: {Error}", selector, ex.Message);
                     }
                 }
 
                 // Strategy 4: Try pressing Enter in the password field
-                _logger.LogInformation("Strategy 4: Pressing Enter in password field");
+                logger.LogInformation("Strategy 4: Pressing Enter in password field");
                 try
                 {
                     await page.FocusAsync("input[type=\"password\"]");
                     await page.Keyboard.PressAsync("Enter");
-                    _logger.LogInformation("Enter key pressed in password field");
+                    logger.LogInformation("Enter key pressed in password field");
 
                     // Check if we've navigated away from the login page
                     await page.WaitForTimeoutAsync(2000);
                     var currentUrl = page.Url;
                     if (!currentUrl.Contains("login"))
                     {
-                        _logger.LogInformation("Login successful, URL changed to: {Url}", currentUrl);
+                        logger.LogInformation("Login successful, URL changed to: {Url}", currentUrl);
                         return; // Exit early if login was successful
                     }
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogWarning("Enter key press failed: {Error}", ex.Message);
+                    logger.LogWarning("Enter key press failed: {Error}", ex.Message);
                 }
 
                 // Check if login was successful without waiting for navigation
                 var finalUrl = page.Url;
-                _logger.LogInformation("Current URL after login attempts: {Url}", finalUrl);
+                logger.LogInformation("Current URL after login attempts: {Url}", finalUrl);
 
                 if (finalUrl.Contains("login"))
                 {
-                    _logger.LogWarning("Login failed - still on login page");
+                    logger.LogWarning("Login failed - still on login page");
                     throw new Exception("Login failed");
                 }
                 else
                 {
-                    _logger.LogInformation("Login successful");
+                    logger.LogInformation("Login successful");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Login error");
+                logger.LogError(ex, "Login error");
                 // Take a screenshot of the error state
                 var errorScreenshotDir = Path.Combine("screenshots", "caterchoice");
                 Directory.CreateDirectory(errorScreenshotDir);
                 var errorScreenshotPath = Path.Combine(errorScreenshotDir, "login-error.png");
                 await page.ScreenshotAsync(new PageScreenshotOptions { Path = errorScreenshotPath, FullPage = true });
-                _logger.LogInformation("Error state screenshot saved as {ErrorScreenshotPath}", errorScreenshotPath);
+                logger.LogInformation("Error state screenshot saved as {ErrorScreenshotPath}", errorScreenshotPath);
                 throw;
             }
         }

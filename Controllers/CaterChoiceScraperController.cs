@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
-using WebScrapperApi.Models;
-using WebScrapperApi.Services;
+using Newtonsoft.Json;
 
 namespace WebScrapperApi.Controllers
 {
@@ -20,6 +19,18 @@ namespace WebScrapperApi.Controllers
         [HttpPost("scrape-all-categories")]
         public async Task<IActionResult> ScrapeAllCategories([FromBody] ScrapingOptions options)
         {
+            var maskedPassword = string.IsNullOrWhiteSpace(options.Password) ? "<empty>" : "<provided>";
+
+            _logger.LogInformation("ScrapingOptions received: {Options}", JsonConvert.SerializeObject(new
+            {
+                options.Email,
+                Password = maskedPassword,
+                options.UseCredentials,
+                options.Headless,
+                options.DownloadImages,
+                options.StoreInMongoDB,
+                options.OutputFile
+            }));
             if (!_scraperLockService.TryStartScraping("CaterChoice"))
             {
                 return Conflict(new
@@ -64,6 +75,18 @@ namespace WebScrapperApi.Controllers
         [HttpPost("scrape-category/{categoryName}")]
         public async Task<IActionResult> ScrapeCategory(string categoryName, [FromBody] ScrapingOptions options)
         {
+            var maskedPassword = string.IsNullOrWhiteSpace(options.Password) ? "<empty>" : "<provided>";
+
+            _logger.LogInformation("ScrapingOptions received: {Options}", JsonConvert.SerializeObject(new
+            {
+                options.Email,
+                Password = maskedPassword,
+                options.UseCredentials,
+                options.Headless,
+                options.DownloadImages,
+                options.StoreInMongoDB,
+                options.OutputFile
+            }));
             if (!_scraperLockService.TryStartScraping("CaterChoice"))
             {
                 return Conflict(new
