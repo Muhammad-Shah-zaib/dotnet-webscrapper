@@ -30,6 +30,6 @@ public class CaterChoiceProduct
     public DateTime ScrapedTimestamp { get; set; }
     public string Source { get; set; } = "CaterChoice_Standalone_Mongo";
 
-    public string? MatchedCKFastFoodProductId { get; set; }
+    public string? MatchedCKFastFoodProductId { get; set; } = string.Empty;
     public double? CkFastFoodMatchScore { get; set; }
 }

@@ -1,6 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
 
-
 namespace WebScrapperApi.Controllers
 {
     [ApiController]
@@ -9,11 +8,12 @@ namespace WebScrapperApi.Controllers
     {
         private readonly MetroScraperService _metroScraperService = metroScraperService;
         private readonly ScraperLockService _scraperLockService = scraperLockService;
-        private readonly ILogger<MetroScraperController> _logger = logger;
 
         [HttpPost("scrape-all-categories")]
         public async Task<IActionResult> ScrapeAllCategories([FromBody] ScrapingOptions options)
         {
+            LogModels.ScrapingOptions(options, logger);
+
             if (!_scraperLockService.TryStartScraping("Metro"))
             {
                 return Conflict(new
@@ -25,14 +25,14 @@ namespace WebScrapperApi.Controllers
 
             try
             {
-                _logger.LogInformation("Starting Metro scrape all categories request");
+                logger.LogInformation("Starting Metro scrape all categories request");
                 var result = await _metroScraperService.ScrapeAllCategoriesAsync(options);
-                _logger.LogInformation("Metro scrape all categories completed successfully. Total products: {TotalProducts}", result.TotalProducts);
+                logger.LogInformation("Metro scrape all categories completed successfully. Total products: {TotalProducts}", result.TotalProducts);
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during Metro scrape all categories request");
+                logger.LogError(ex, "Error during Metro scrape all categories request");
                 return StatusCode(500, new
                 {
                     status = "error",
@@ -56,6 +56,8 @@ namespace WebScrapperApi.Controllers
         [HttpPost("scrape-category/{categoryName}")]
         public async Task<IActionResult> ScrapeCategory(string categoryName, [FromBody] ScrapingOptions options)
         {
+            LogModels.ScrapingOptions(options, logger);
+
             if (!_scraperLockService.TryStartScraping("Metro"))
             {
                 return Conflict(new
@@ -66,7 +68,7 @@ namespace WebScrapperApi.Controllers
             }
             try
             {
-                _logger.LogInformation("Starting Metro scrape category request for: {CategoryName}", categoryName);
+                logger.LogInformation("Starting Metro scrape category request for: {CategoryName}", categoryName);
 
                 var category = MetroConfig.METRO_CATEGORIES
                     .FirstOrDefault(c => string.Equals(c.Name, categoryName, StringComparison.OrdinalIgnoreCase));
@@ -83,7 +85,7 @@ namespace WebScrapperApi.Controllers
 
                 var products = await _metroScraperService.ScrapeCategoryAsync(options, category);
 
-                _logger.LogInformation("Metro scrape category completed successfully. Products found: {ProductCount}", products.Count);
+                logger.LogInformation("Metro scrape category completed successfully. Products found: {ProductCount}", products.Count);
 
                 return Ok(new
                 {
@@ -96,7 +98,7 @@ namespace WebScrapperApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during Metro scrape category request for {CategoryName}", categoryName);
+                logger.LogError(ex, "Error during Metro scrape category request for {CategoryName}", categoryName);
                 return StatusCode(500, new
                 {
                     status = "error",
@@ -134,7 +136,7 @@ namespace WebScrapperApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting Metro categories");
+                logger.LogError(ex, "Error getting Metro categories");
                 return StatusCode(500, new
                 {
                     status = "error",
@@ -174,7 +176,7 @@ namespace WebScrapperApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting Metro configuration");
+                logger.LogError(ex, "Error getting Metro configuration");
                 return StatusCode(500, new
                 {
                     status = "error",

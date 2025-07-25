@@ -3,6 +3,7 @@ global using WebScrapperApi.Models;
 global using WebScrapperApi.Data;
 global using Microsoft.Playwright;
 global using WebScrapperApi.Configuration;
+global using WebScrapperApi.utils;
 
 var builder = WebApplication.CreateBuilder(args);
 

@@ -1,7 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using WebScrapperApi.Models;
-using WebScrapperApi.Services;
-using WebScrapperApi.Configuration;
 
 namespace WebScrapperApi.Controllers
 {
@@ -10,7 +7,6 @@ namespace WebScrapperApi.Controllers
     public class AdamsController(AdamsScraperService adamsScraperService, ILogger<AdamsController> logger,  ScraperLockService scraperLockService ) : ControllerBase
     {
         private readonly AdamsScraperService _adamsScraperService = adamsScraperService;
-        private readonly ILogger<AdamsController> _logger = logger;
         private readonly ScraperLockService _scraperLockService = scraperLockService;
 
         /// <summary>
@@ -21,6 +17,8 @@ namespace WebScrapperApi.Controllers
         [HttpPost("scrape-all-categories")]
         public async Task<IActionResult> ScrapeAllCategories([FromBody] ScrapingOptions options)
         {
+            LogModels.ScrapingOptions(options, logger);
+
             if (!_scraperLockService.TryStartScraping("Adams"))
             {
                 return Conflict(new
@@ -32,18 +30,18 @@ namespace WebScrapperApi.Controllers
 
             try
             {
-                _logger.LogInformation("Starting Adams scrape all categories request");
+                logger.LogInformation("Starting Adams scrape all categories request");
 
                 var result = await _adamsScraperService.ScrapeAllCategoriesAsync(options);
 
-                _logger.LogInformation("Adams scrape all categories completed successfully. Total products: {TotalProducts}", 
+                logger.LogInformation("Adams scrape all categories completed successfully. Total products: {TotalProducts}",
                     result.TotalProducts);
 
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during Adams scrape all categories request");
+                logger.LogError(ex, "Error during Adams scrape all categories request");
                 return StatusCode(500, new
                 {
                     status = "error",
@@ -67,6 +65,8 @@ namespace WebScrapperApi.Controllers
         [HttpPost("scrape-category/{categoryName}")]
         public async Task<IActionResult> ScrapeCategory(string categoryName, [FromBody] ScrapingOptions options)
         {
+            LogModels.ScrapingOptions(options, logger);
+
             if (!_scraperLockService.TryStartScraping("Adams"))
             {
                 return Conflict(new
@@ -78,7 +78,7 @@ namespace WebScrapperApi.Controllers
 
             try
             {
-                _logger.LogInformation("Starting Adams scrape category request for: {CategoryName}", categoryName);
+                logger.LogInformation("Starting Adams scrape category request for: {CategoryName}", categoryName);
 
                 var category = AdamsConfig.ADAMS_CATEGORIES
                     .FirstOrDefault(c => string.Equals(c.Name, categoryName, StringComparison.OrdinalIgnoreCase));
@@ -95,7 +95,7 @@ namespace WebScrapperApi.Controllers
 
                 var products = await _adamsScraperService.ScrapeCategoryAsync(options, category);
 
-                _logger.LogInformation("Adams scrape category completed successfully. Products found: {ProductCount}", 
+                logger.LogInformation("Adams scrape category completed successfully. Products found: {ProductCount}",
                     products.Count);
 
                 return Ok(new
@@ -109,7 +109,7 @@ namespace WebScrapperApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during Adams scrape category request for {CategoryName}", categoryName);
+                logger.LogError(ex, "Error during Adams scrape category request for {CategoryName}", categoryName);
                 return StatusCode(500, new
                 {
                     status = "error",
@@ -148,7 +148,7 @@ namespace WebScrapperApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting Adams categories");
+                logger.LogError(ex, "Error getting Adams categories");
                 return StatusCode(500, new
                 {
                     status = "error",
@@ -188,7 +188,7 @@ namespace WebScrapperApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting Adams configuration");
+                logger.LogError(ex, "Error getting Adams configuration");
                 return StatusCode(500, new
                 {
                     status = "error",

@@ -57,7 +57,7 @@ namespace WebScrapperApi.Services
 
                     try
                     {
-                        var categoryProducts = await ScrapeCategoryAsync(options, category, browser);
+                        var categoryProducts = await ScrapeCategoryAsync(MapModels.ScrapingOptions(options), category, browser);
                         allProducts.AddRange(categoryProducts);
                         statistics.CategoriesProcessed.Add(category.Name);
                         statistics.TotalProcessed += categoryProducts.Count;

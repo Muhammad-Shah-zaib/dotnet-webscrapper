@@ -46,11 +46,7 @@ namespace WebScrapperApi.Services
 
                     try
                     {
-                        var categoryProducts = await ScrapeCategoryAsync(new ScrapingOptions
-                        {
-                            Headless = options.Headless,
-                            DownloadImages = options.DownloadImages
-                        }, category, browser);
+                        var categoryProducts = await ScrapeCategoryAsync(MapModels.ScrapingOptions(options), category, browser);
 
                         allProducts.AddRange(categoryProducts);
                         statistics.CategoriesProcessed.Add(category.Name);

@@ -1,5 +1,4 @@
 using Microsoft.AspNetCore.Mvc;
-using Newtonsoft.Json;
 
 namespace WebScrapperApi.Controllers
 {
@@ -9,7 +8,6 @@ namespace WebScrapperApi.Controllers
     {
         private readonly CaterChoiceScraperService _scraperService = scraperService;
         private readonly ScraperLockService _scraperLockService = scraperLockService;
-        private readonly ILogger<CaterChoiceScraperController> _logger = logger;
 
         /// <summary>
         /// Scrape all categories from Cater Choice
@@ -19,18 +17,8 @@ namespace WebScrapperApi.Controllers
         [HttpPost("scrape-all-categories")]
         public async Task<IActionResult> ScrapeAllCategories([FromBody] ScrapingOptions options)
         {
-            var maskedPassword = string.IsNullOrWhiteSpace(options.Password) ? "<empty>" : "<provided>";
+            LogModels.ScrapingOptions(options, logger);
 
-            _logger.LogInformation("ScrapingOptions received: {Options}", JsonConvert.SerializeObject(new
-            {
-                options.Email,
-                Password = maskedPassword,
-                options.UseCredentials,
-                options.Headless,
-                options.DownloadImages,
-                options.StoreInMongoDB,
-                options.OutputFile
-            }));
             if (!_scraperLockService.TryStartScraping("CaterChoice"))
             {
                 return Conflict(new
@@ -41,18 +29,18 @@ namespace WebScrapperApi.Controllers
             }
             try
             {
-                _logger.LogInformation("Starting scrape all categories request");
+                logger.LogInformation("Starting scrape all categories request");
 
                 var result = await _scraperService.ScrapeAllCategoriesAsync(options);
 
-                _logger.LogInformation("Scrape all categories completed successfully. Total products: {TotalProducts}",
+                logger.LogInformation("Scrape all categories completed successfully. Total products: {TotalProducts}",
                     result.TotalProducts);
 
                 return Ok(result);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during scrape all categories request");
+                logger.LogError(ex, "Error during scrape all categories request");
                 return StatusCode(500, new
                 {
                     status = "error",
@@ -75,18 +63,7 @@ namespace WebScrapperApi.Controllers
         [HttpPost("scrape-category/{categoryName}")]
         public async Task<IActionResult> ScrapeCategory(string categoryName, [FromBody] ScrapingOptions options)
         {
-            var maskedPassword = string.IsNullOrWhiteSpace(options.Password) ? "<empty>" : "<provided>";
-
-            _logger.LogInformation("ScrapingOptions received: {Options}", JsonConvert.SerializeObject(new
-            {
-                options.Email,
-                Password = maskedPassword,
-                options.UseCredentials,
-                options.Headless,
-                options.DownloadImages,
-                options.StoreInMongoDB,
-                options.OutputFile
-            }));
+            LogModels.ScrapingOptions(options, logger);
             if (!_scraperLockService.TryStartScraping("CaterChoice"))
             {
                 return Conflict(new
@@ -98,7 +75,7 @@ namespace WebScrapperApi.Controllers
 
             try
             {
-                _logger.LogInformation("Starting scrape category request for: {CategoryName}", categoryName);
+                logger.LogInformation("Starting scrape category request for: {CategoryName}", categoryName);
 
                 // Find the category by name
                 var category = CaterChoiceConfig.CATER_CHOICE_CATEGORIES
@@ -116,7 +93,7 @@ namespace WebScrapperApi.Controllers
 
                 var products = await _scraperService.ScrapeCategoryAsync(options, category);
 
-                _logger.LogInformation("Scrape category completed successfully. Products found: {ProductCount}",
+                logger.LogInformation("Scrape category completed successfully. Products found: {ProductCount}",
                     products.Count);
 
                 return Ok(new
@@ -130,7 +107,7 @@ namespace WebScrapperApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during scrape category request for {CategoryName}", categoryName);
+                logger.LogError(ex, "Error during scrape category request for {CategoryName}", categoryName);
                 return StatusCode(500, new
                 {
                     status = "error",
@@ -168,7 +145,7 @@ namespace WebScrapperApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting categories");
+                logger.LogError(ex, "Error getting categories");
                 return StatusCode(500, new
                 {
                     status = "error",
@@ -209,7 +186,7 @@ namespace WebScrapperApi.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error getting configuration");
+                logger.LogError(ex, "Error getting configuration");
                 return StatusCode(500, new
                 {
                     status = "error",
