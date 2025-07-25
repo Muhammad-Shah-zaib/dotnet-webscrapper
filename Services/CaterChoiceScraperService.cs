@@ -143,6 +143,26 @@ namespace WebScrapperApi.Services
             var startTime = DateTime.UtcNow;
             var products = new List<CaterChoiceProduct>();
 
+            var email = _credentials.Email;
+            var password = _credentials.Password;
+
+            if ( options.Email != string.Empty)
+            {
+                email = options.Email;
+            }
+            if (options.Password != string.Empty)
+            {
+                password = options.Password;
+            }
+            logger.LogCritical("-------------------------");
+            logger.LogCritical("-------------------------");
+            logger.LogCritical("-------------------------");
+            logger.LogCritical(email);
+            logger.LogCritical(password);
+            logger.LogCritical("-------------------------");
+            logger.LogCritical("-------------------------");
+            logger.LogCritical("-------------------------");
+
             // MongoDB setup
             var mongoEnabled = false;
 
@@ -200,7 +220,7 @@ namespace WebScrapperApi.Services
                 if (options.UseCredentials)
                 {
                     _logger.LogInformation("Using credentials, attempting login...");
-                    await LoginAsync(page, _credentials.Email, _credentials.Password);
+                    await LoginAsync(page, email, password);
                 }
                 else
                 {
