@@ -1,6 +1,4 @@
 using MongoDB.Driver;
-using WebScrapperApi.Models;
-using Microsoft.Extensions.Configuration;
 
 namespace WebScrapperApi.Data
 {
