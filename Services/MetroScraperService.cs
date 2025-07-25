@@ -262,10 +262,10 @@ namespace WebScrapperApi.Services
 
                 return products;
             }
-            catch (StandaloneScrapingResultException )
+            catch (StandaloneScrapingResultException ex)
             {
                 // Special case: return ScrapingResult for standalone scrape
-                return []; // The controller should catch this and return ex.Result
+                  return ex.Result.MetroProducts ?? [];
             }
             catch (Exception ex)
             {
