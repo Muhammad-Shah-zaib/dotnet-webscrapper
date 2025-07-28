@@ -22,21 +22,16 @@ builder.Services.AddScoped<ScraperDbContext>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// need to add cors here
+// CORS FOR ALL ORIGINS
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.WithOrigins(
-                "http://localhost:5173",
-                "https://ckscraperportal.vercel.app"
-            )
-            .AllowAnyHeader()
-            .AllowAnyMethod()
-            .AllowCredentials();
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
     });
 });
-
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
