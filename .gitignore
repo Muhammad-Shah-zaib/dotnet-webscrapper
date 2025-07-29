@@ -6,6 +6,9 @@
 # local storage json obejcts
 LocalStorage/
 
+# logs file
+Logs/
+
 # dotenv files
 .env
 
