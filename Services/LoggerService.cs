@@ -8,10 +8,10 @@ public enum LogLevel
     Critical
 }
 
-public class LoggerService(ILogger<LoggerService> logger)
+public class LoggerService(ILogger<LoggerService> logger, IWebHostEnvironment environment)
 {
-    private readonly string _logDirectory = Path.Combine(Directory.GetCurrentDirectory(), "Logs");
-
+    private readonly ILogger<LoggerService> _logger = logger;
+    private readonly string _logDirectory = Path.Combine(environment.ContentRootPath, "Logs");
 
     public void Log(string scraperName, LogLevel logLevel, string message)
     {
@@ -27,16 +27,16 @@ public class LoggerService(ILogger<LoggerService> logger)
             switch (logLevel)
             {
                 case LogLevel.Information:
-                    logger.LogInformation(logMessage);
+                    _logger.LogInformation(logMessage);
                     break;
                 case LogLevel.Warning:
-                    logger.LogWarning(logMessage);
+                    _logger.LogWarning(logMessage);
                     break;
                 case LogLevel.Error:
-                    logger.LogError(logMessage);
+                    _logger.LogError(logMessage);
                     break;
                 case LogLevel.Critical:
-                    logger.LogCritical(logMessage);
+                    _logger.LogCritical(logMessage);
                     break;
             }
 
@@ -44,7 +44,7 @@ public class LoggerService(ILogger<LoggerService> logger)
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Failed to write to log file.");
+            _logger.LogError(ex, "Failed to write to log file.");
         }
     }
 }
