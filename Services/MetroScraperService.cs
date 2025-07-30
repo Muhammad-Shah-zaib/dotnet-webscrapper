@@ -1,16 +1,9 @@
-using Microsoft.Playwright;
-using Microsoft.Extensions.Logging;
-using WebScrapperApi.Models;
-using WebScrapperApi.Configuration;
-using System.Collections.Generic;
-using System.Threading.Tasks;
-
 namespace WebScrapperApi.Services
 {
-    public class MetroScraperService(UtilityService utilityService, ILogger<MetroScraperService> logger, ScraperDbContext dbContext)
+    public class MetroScraperService(UtilityService utilityService, LoggerService loggerService, ScraperDbContext dbContext)
     {
         private readonly UtilityService _utilityService = utilityService;
-        private readonly ILogger<MetroScraperService> _logger = logger;
+        private readonly LoggerService _loggerService = loggerService;
         private readonly ScraperDbContext _dbContext = dbContext;
 
         public async Task<ScrapingResult> ScrapeAllCategoriesAsync(ScrapingOptions options)
@@ -28,17 +21,17 @@ namespace WebScrapperApi.Services
                 {
                     await _dbContext.ConnectAsync();
                     mongoEnabled = true;
-                    _logger.LogInformation("MongoDB connection established using ScraperDbContext");
+                    _loggerService.Log("Metro", LogLevel.Information, "MongoDB connection established using ScraperDbContext");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to connect to MongoDB. Proceeding without database integration.");
+                    _loggerService.Log("Metro", LogLevel.Error, $"Failed to connect to MongoDB. Proceeding without database integration. - Exception: {ex.Message}");
                     mongoEnabled = false;
                 }
             }
             else
             {
-                _logger.LogInformation("MongoDB storage disabled by user preference");
+                _loggerService.Log("Metro", LogLevel.Information, "MongoDB storage disabled by user preference");
             }
 
             // Initialize Playwright
@@ -53,7 +46,7 @@ namespace WebScrapperApi.Services
                 // Process each category
                 foreach (var category in MetroConfig.METRO_CATEGORIES)
                 {
-                    _logger.LogInformation("Processing Metro category: {CategoryName}", category.Name);
+                    _loggerService.Log("Metro", LogLevel.Information, $"Processing Metro category: {category.Name}");
 
                     try
                     {
@@ -78,7 +71,7 @@ namespace WebScrapperApi.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogError(ex, "Error scraping Metro category {CategoryName}", category.Name);
+                        _loggerService.Log("Metro", LogLevel.Error, $"Error scraping Metro category {category.Name} - Exception: {ex.Message}");
                         statistics.Errors++;
                     }
                 }
@@ -126,15 +119,15 @@ namespace WebScrapperApi.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error during Metro scraping process");
+                _loggerService.Log("Metro", LogLevel.Critical, $"Error during Metro scraping process - Exception: {ex.Message}");
                 throw;
             }
         }
 
         public async Task<List<MetroProduct>> ScrapeCategoryAsync(ScrapingOptions options, Category category, IBrowser? existingBrowser = null)
         {
-            _logger.LogInformation("Starting to scrape Metro category: {CategoryName}", category.Name);
-            _logger.LogInformation("Category URL: {CategoryUrl}", category.Url);
+            _loggerService.Log("Metro", LogLevel.Information, $"Starting to scrape Metro category: {category.Name}");
+            _loggerService.Log("Metro", LogLevel.Information, $"Category URL: {category.Url}");
 
             var startTime = DateTime.UtcNow;
             var products = new List<MetroProduct>();
@@ -151,17 +144,17 @@ namespace WebScrapperApi.Services
                 {
                     await _dbContext.ConnectAsync();
                     mongoEnabled = true;
-                    _logger.LogInformation("MongoDB connection established using ScraperDbContext");
+                    _loggerService.Log("Metro", LogLevel.Information, "MongoDB connection established using ScraperDbContext");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Failed to connect to MongoDB. Proceeding without database integration.");
+                    _loggerService.Log("Metro", LogLevel.Error, $"Failed to connect to MongoDB. Proceeding without database integration. - Exception: {ex.Message}");
                     mongoEnabled = false;
                 }
             }
             else
             {
-                _logger.LogInformation("MongoDB storage disabled by user preference");
+                _loggerService.Log("Metro", LogLevel.Information, "MongoDB storage disabled by user preference");
             }
 
             try
@@ -192,14 +185,14 @@ namespace WebScrapperApi.Services
                 // Scrape category with pagination
                 products = await ScrapeCategoryWithPaginationAsync(page, category, options.DownloadImages, 0);
 
-                _logger.LogInformation("Finished scraping category {CategoryName}, found {ProductCount} products total", category.Name, products.Count);
+                _loggerService.Log("Metro", LogLevel.Information, $"Finished scraping category {category.Name}, found {products.Count} products total");
 
                 // Save to MongoDB if enabled
                 if (mongoEnabled && products.Count > 0)
                 {
-                    _logger.LogInformation("Saving {Count} products to MongoDB...", products.Count);
+                    _loggerService.Log("Metro", LogLevel.Information, $"Saving {products.Count} products to MongoDB...");
                     mongoStats = await _dbContext.SaveMetroProductsAsync(products);
-                    _logger.LogInformation("MongoDB save stats: {Stats}", System.Text.Json.JsonSerializer.Serialize(mongoStats));
+                    _loggerService.Log("Metro", LogLevel.Information, $"MongoDB save stats: {System.Text.Json.JsonSerializer.Serialize(mongoStats)}");
                 }
 
                 // If this is a standalone category scrape
@@ -241,7 +234,7 @@ namespace WebScrapperApi.Services
                         _dbContext.Disconnect();
                     }
 
-                    _logger.LogInformation("Metro category scraping completed successfully for category: {CategoryName}", category.Name);
+                    _loggerService.Log("Metro", LogLevel.Information, $"Metro category scraping completed successfully for category: {category.Name}");
 
                     // Return ScrapingResult for standalone
                     throw new StandaloneScrapingResultException(new ScrapingResult
@@ -269,7 +262,7 @@ namespace WebScrapperApi.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error scraping Metro category {CategoryName}", category.Name);
+                _loggerService.Log("Metro", LogLevel.Error, $"Error scraping Metro category {category.Name} - Exception: {ex.Message}");
                 throw;
             }
             finally
@@ -300,7 +293,7 @@ namespace WebScrapperApi.Services
                     paginatedUrl = uriBuilder.ToString();
                 }
 
-                _logger.LogInformation("Navigating to: {PaginatedUrl}", paginatedUrl);
+                _loggerService.Log("Metro", LogLevel.Information, $"Navigating to: {paginatedUrl}");
                 await page.GotoAsync(paginatedUrl, new PageGotoOptions { Timeout = 60000 });
                 await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 30000 });
 
@@ -308,43 +301,43 @@ namespace WebScrapperApi.Services
                 try
                 {
                     await page.WaitForSelectorAsync(MetroConfig.MetroSelectors.PRODUCT_GRID, new PageWaitForSelectorOptions { Timeout = 20000 });
-                    _logger.LogInformation("Products found on page");
+                    _loggerService.Log("Metro", LogLevel.Information, "Products found on page");
                 }
                 catch (Exception)
                 {
-                    _logger.LogInformation("No product grid found on this page, might be end of pagination");
+                    _loggerService.Log("Metro", LogLevel.Information, "No product grid found on this page, might be end of pagination");
                     return allProducts;
                 }
 
                 // Extract products from current page
                 var pageProducts = await ExtractProductsFromPageAsync(page, category.Name, downloadImages);
-                _logger.LogInformation("Found {Count} products on current page", pageProducts.Count);
+                _loggerService.Log("Metro", LogLevel.Information, $"Found {pageProducts.Count} products on current page");
                 allProducts.AddRange(pageProducts);
 
                 // Check for next page
                 var nextButton = await page.QuerySelectorAsync(MetroConfig.MetroSelectors.NEXT_PAGE);
                 if (nextButton != null)
                 {
-                    _logger.LogInformation("Found next page button, continuing pagination...");
+                    _loggerService.Log("Metro", LogLevel.Information, "Found next page button, continuing pagination...");
                     var nextOffset = offset + 60; // Metro uses 60 items per page
                     var nextPageProducts = await ScrapeCategoryWithPaginationAsync(page, category, downloadImages, nextOffset);
                     allProducts.AddRange(nextPageProducts);
                 }
                 else
                 {
-                    _logger.LogInformation("No more pages found, pagination complete");
+                    _loggerService.Log("Metro", LogLevel.Information, "No more pages found, pagination complete");
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error scraping page with offset {Offset}", offset);
+                _loggerService.Log("Metro", LogLevel.Error, $"Error scraping page with offset {offset} - Exception: {ex.Message}");
             }
             return allProducts;
         }
 
         private async Task<List<MetroProduct>> ExtractProductsFromPageAsync(IPage page, string categoryName, bool downloadImages)
         {
-            _logger.LogInformation("Extracting products from page for category: {CategoryName}", categoryName);
+            _loggerService.Log("Metro", LogLevel.Information, $"Extracting products from page for category: {categoryName}");
             var products = new List<MetroProduct>();
 
             // Take a screenshot of the category page for debugging
@@ -356,19 +349,19 @@ namespace WebScrapperApi.Services
                 Path = screenshotPath,
                 FullPage = true
             });
-            _logger.LogInformation("Category page screenshot saved as {ScreenshotPath}", screenshotPath);
+            _loggerService.Log("Metro", LogLevel.Information, $"Category page screenshot saved as {screenshotPath}");
 
             // Get all product elements
             // TODO: CHECK IF THIS SELECTOR IS CORRECT
             var productElements = await page.QuerySelectorAllAsync(MetroConfig.MetroSelectors.PRODUCT_ITEM);
-            _logger.LogInformation("Processing {Count} product elements", productElements.Count);
+            _loggerService.Log("Metro", LogLevel.Information, $"Processing {productElements.Count} product elements");
 
             for (int i = 0; i < productElements.Count; i++)
             {
                 var productElement = productElements[i];
                 try
                 {
-                    _logger.LogInformation("Processing product {Index} of {Total}", i + 1, productElements.Count);
+                    _loggerService.Log("Metro", LogLevel.Information, $"Processing product {i + 1} of {productElements.Count}");
 
                     // Extract product name
                     string productName = "Unknown Product";
@@ -388,7 +381,7 @@ namespace WebScrapperApi.Services
                                 productName = await nameElement.InnerTextAsync();
                                 if (!string.IsNullOrWhiteSpace(productName))
                                 {
-                                    _logger.LogInformation("Found product name: {ProductName}", productName);
+                                    _loggerService.Log("Metro", LogLevel.Information, $"Found product name: {productName}");
                                     break;
                                 }
                             }
@@ -397,7 +390,7 @@ namespace WebScrapperApi.Services
                     }
                     if (string.IsNullOrWhiteSpace(productName) || productName == "Unknown Product")
                     {
-                        _logger.LogInformation("Skipping product {Index}: no valid name found", i + 1);
+                        _loggerService.Log("Metro", LogLevel.Information, $"Skipping product {i + 1}: no valid name found");
                         continue;
                     }
 
@@ -420,7 +413,7 @@ namespace WebScrapperApi.Services
                                 productPrice = await priceElement.InnerTextAsync();
                                 if (!string.IsNullOrWhiteSpace(productPrice))
                                 {
-                                    _logger.LogInformation("Found product price: {ProductPrice}", productPrice);
+                                    _loggerService.Log("Metro", LogLevel.Information, $"Found product price: {productPrice}");
                                     break;
                                 }
                             }
@@ -440,10 +433,10 @@ namespace WebScrapperApi.Services
                             {
                                 productUrl = MetroConfig.METRO_BASE_URL.TrimEnd('/') + "/" + productUrl.TrimStart('/');
                             }
-                            _logger.LogInformation("Found product URL: {ProductUrl}", productUrl);
+                            _loggerService.Log("Metro", LogLevel.Information, $"Found product URL: {productUrl}");
                         }
                     }
-                    catch { _logger.LogInformation("Could not extract product URL"); }
+                    catch { _loggerService.Log("Metro", LogLevel.Warning, "Could not extract product URL"); }
 
                     // Extract product image
                     string? imageUrl = null;
@@ -460,7 +453,7 @@ namespace WebScrapperApi.Services
                                 imageUrl = await imgElement.GetAttributeAsync("src");
                                 if (!string.IsNullOrEmpty(imageUrl))
                                 {
-                                    _logger.LogInformation("Found img src URL: {ImageUrl}", imageUrl);
+                                    _loggerService.Log("Metro", LogLevel.Information, $"Found img src URL: {imageUrl}");
                                 }
                             }
 
@@ -474,7 +467,7 @@ namespace WebScrapperApi.Services
                                     if (match.Success)
                                     {
                                         imageUrl = match.Groups["url"].Value;
-                                        _logger.LogInformation("Found background image URL: {ImageUrl}", imageUrl);
+                                        _loggerService.Log("Metro", LogLevel.Information, $"Found background image URL: {imageUrl}");
                                     }
                                 }
                             }
@@ -482,21 +475,21 @@ namespace WebScrapperApi.Services
                     }
                     catch (Exception ex)
                     {
-                        _logger.LogInformation("Error extracting image: {Error}", ex.Message);
+                        _loggerService.Log("Metro", LogLevel.Warning, $"Error extracting image: {ex.Message}");
                     }
 
                     // Download image if enabled and URL found
                     string? imageLocation = null;
                     if (downloadImages && !string.IsNullOrEmpty(imageUrl))
                     {
-                        _logger.LogInformation("Downloading image for product: {ProductName}", productName);
+                        _loggerService.Log("Metro", LogLevel.Information, $"Downloading image for product: {productName}");
                         var productNameHash = _utilityService.GenerateHash(productName);
                         var imageResult = await _utilityService.DownloadImageAsync(imageUrl, productNameHash, "images/metro");
                         if (imageResult != null)
                         {
                             imageFilename = imageResult.Filename;
                             imageLocation = $"images/metro/{imageFilename}";
-                            _logger.LogInformation("Image downloaded: {ImageFilename}", imageFilename);
+                            _loggerService.Log("Metro", LogLevel.Information, $"Image downloaded: {imageFilename}");
                         }
                     }
 
@@ -522,14 +515,14 @@ namespace WebScrapperApi.Services
                         ScrapedTimestamp = DateTime.UtcNow
                     };
                     products.Add(product);
-                    _logger.LogInformation("Successfully extracted product: {ProductName}", productName);
+                    _loggerService.Log("Metro", LogLevel.Information, $"Successfully extracted product: {productName}");
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error extracting product {Index}", i + 1);
+                    _loggerService.Log("Metro", LogLevel.Error, $"Error extracting product {i + 1} - Exception: {ex.Message}");
                 }
             }
-            _logger.LogInformation("Successfully extracted {Count} products from {CategoryName}", products.Count, categoryName);
+            _loggerService.Log("Metro", LogLevel.Information, $"Successfully extracted {products.Count} products from {categoryName}");
             return products;
         }
 
@@ -540,4 +533,4 @@ namespace WebScrapperApi.Services
             public StandaloneScrapingResultException(ScrapingResult result) => Result = result;
         }
     }
-} 
+}
