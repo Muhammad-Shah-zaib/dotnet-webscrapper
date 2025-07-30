@@ -1,6 +1,3 @@
-using Microsoft.Playwright;
-using System.Linq;
-
 namespace WebScrapperApi.Services
 {
     public class AdamsScraperService(
@@ -21,21 +18,21 @@ namespace WebScrapperApi.Services
             // MongoDB setup
             var mongoEnabled = false;
 
-            try
+            if (options.StoreInMongoDB)
             {
-                if (options.StoreInMongoDB)
+                try
                 {
                     await _dbContext.ConnectAsync();
                     mongoEnabled = true;
                     _loggerService.Log("Adams", LogLevel.Information,
                         "MongoDB connection established using ScraperDbContext");
                 }
-            }
-            catch (Exception ex)
-            {
-                _loggerService.Log("Adams", LogLevel.Error,
-                    $"Failed to connect to MongoDB. Proceeding without database integration. - Exception: {ex.Message}");
-                mongoEnabled = false;
+                catch (Exception ex)
+                {
+                    _loggerService.Log("Adams", LogLevel.Error,
+                        $"Failed to connect to MongoDB. Proceeding without database integration. - Exception: {ex.Message}");
+                    mongoEnabled = false;
+                }
             }
 
             // Initialize Playwright
@@ -55,7 +52,7 @@ namespace WebScrapperApi.Services
                     try
                     {
                         var categoryProducts =
-                            await ScrapeCategoryAsync(MapModels.ScrapingOptions(options), category, browser);
+                            await ScrapeCategoryAsync(MapModels.ScrapingOptions(options), category, browser, manageMongo: false);
 
                         allProducts.AddRange(categoryProducts);
                         statistics.CategoriesProcessed.Add(category.Name);
@@ -65,6 +62,8 @@ namespace WebScrapperApi.Services
                         if (mongoEnabled)
                         {
                             var mongoStats = await _dbContext.SaveAdamsProductsAsync(categoryProducts);
+                            _loggerService.Log("Adams", LogLevel.Information,
+                                $"MongoDB save stats for {category.Name}: {System.Text.Json.JsonSerializer.Serialize(mongoStats)}");
                             statistics.NewRecordsAdded += mongoStats.NewRecordsAdded;
                             statistics.ExistingRecordsUpdated += mongoStats.ExistingRecordsUpdated;
                             statistics.RecordsUnchanged += mongoStats.RecordsUnchanged;
@@ -133,7 +132,7 @@ namespace WebScrapperApi.Services
         }
 
         public async Task<List<AdamsProduct>> ScrapeCategoryAsync(ScrapingOptions options, Category category,
-            IBrowser? existingBrowser = null)
+            IBrowser? existingBrowser = null, bool manageMongo = true)
         {
             _loggerService.Log("Adams", LogLevel.Information, $"Starting to scrape Adams category: {category.Name}");
             _loggerService.Log("Adams", LogLevel.Information, $"Category URL: {category.Url}");
@@ -144,18 +143,25 @@ namespace WebScrapperApi.Services
             // MongoDB setup
             var mongoEnabled = false;
 
-            try
+            if (options.StoreInMongoDB && manageMongo)
             {
-                await _dbContext.ConnectAsync();
-                mongoEnabled = true;
-                _loggerService.Log("Adams", LogLevel.Information,
-                    "MongoDB connection established using ScraperDbContext");
+                try
+                {
+                    await _dbContext.ConnectAsync();
+                    mongoEnabled = true;
+                    _loggerService.Log("Adams", LogLevel.Information,
+                        "MongoDB connection established using ScraperDbContext");
+                }
+                catch (Exception ex)
+                {
+                    _loggerService.Log("Adams", LogLevel.Error,
+                        $"Failed to connect to MongoDB. Proceeding without database integration. - Exception: {ex.Message}");
+                    mongoEnabled = false;
+                }
             }
-            catch (Exception ex)
+            else
             {
-                _loggerService.Log("Adams", LogLevel.Error,
-                    $"Failed to connect to MongoDB. Proceeding without database integration. - Exception: {ex.Message}");
-                mongoEnabled = false;
+                _loggerService.Log("Adams", LogLevel.Information, "MongoDB storage is not managed in this context.");
             }
 
             IBrowser? browser = null;
@@ -290,7 +296,7 @@ namespace WebScrapperApi.Services
                 var seenProductUrls =
                     new HashSet<string>(products.Select(p => p.ProductPageUrl!).Where(u => !string.IsNullOrEmpty(u)));
                 int pageNumber = 2;
-                const int MAX_PAGES = 50;
+                const int MAX_PAGES = 30;
 
                 while (pageNumber <= MAX_PAGES)
                 {
@@ -326,6 +332,21 @@ namespace WebScrapperApi.Services
 
                     var newPageProducts = await ExtractProductsFromPageAsync(
                         page, category.Name, paginatedUrl, options.DownloadImages, productElements.ToList());
+
+                    // Identify and log duplicates before filtering
+                    var duplicateProducts = newPageProducts
+                        .Where(p => !string.IsNullOrEmpty(p.ProductPageUrl) && seenProductUrls.Contains(p.ProductPageUrl))
+                        .ToList();
+
+                    if (duplicateProducts.Any())
+                    {
+                        _loggerService.Log("Adams", LogLevel.Information, $"Found {duplicateProducts.Count} duplicate products on page {pageNumber}. They will be skipped.");
+                        foreach (var duplicate in duplicateProducts)
+                        {
+                            _loggerService.Log("Adams", LogLevel.Information, $"Skipping duplicate: {duplicate.Name} ({duplicate.ProductPageUrl})");
+                        }
+                    }
+
                     // Filter duplicates
                     var newUniqueProducts = newPageProducts
                         .Where(p => !string.IsNullOrEmpty(p.ProductPageUrl) &&
@@ -438,7 +459,6 @@ namespace WebScrapperApi.Services
             _loggerService.Log("Adams", LogLevel.Information,
                 $"Extracting products from page for category: {categoryName}");
             var products = new List<AdamsProduct>();
-            var seenProducts = new HashSet<string>();
 
             _loggerService.Log("Adams", LogLevel.Information, $"Processing {productElements.Count} product elements");
 
@@ -486,15 +506,13 @@ namespace WebScrapperApi.Services
                         }
                     }
 
-                    // Skip if we couldn't get a valid name or if it's a duplicate
-                    if (string.IsNullOrEmpty(name) || name == "Unknown Product" || seenProducts.Contains(name))
+                    // Skip if we couldn't get a valid name
+                    if (string.IsNullOrEmpty(name) || name == "Unknown Product")
                     {
                         _loggerService.Log("Adams", LogLevel.Information,
-                            $"Skipping product {i + 1}: {(name == "Unknown Product" ? "no valid name" : "duplicate")}");
+                            $"Skipping product {i + 1}: no valid name found");
                         continue;
                     }
-
-                    seenProducts.Add(name);
 
                     // Get product URL
                     var url = "";
@@ -554,6 +572,8 @@ namespace WebScrapperApi.Services
                         "img",
                         ".wc-block-components-product-image img",
                     };
+
+
 
                     foreach (var selector in imageSelectors)
                     {

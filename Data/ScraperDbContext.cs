@@ -11,11 +11,11 @@ namespace WebScrapperApi.Data
         public ScraperDbContext(IConfiguration configuration)
         {
             _configuration = configuration;
-            var connectionString = _configuration.GetConnectionString("MongoDB") ?? 
-                                 _configuration["ConnectionStrings:MongoDB"];
-            
+            var connectionString = _configuration.GetConnectionString("MongoDB") ??
+                                   _configuration["ConnectionStrings:MongoDB"];
+
             _client = new MongoClient(connectionString);
-            
+
             // Get database mapping from configuration
             _databaseMapping = _configuration.GetSection("MongoDB:ScraperDatabases")
                 .Get<Dictionary<string, string>>() ?? new Dictionary<string, string>();
@@ -27,7 +27,7 @@ namespace WebScrapperApi.Data
             {
                 throw new InvalidOperationException($"No database mapping found for scraper: {scraperName}");
             }
-            
+
             return _client.GetDatabase(databaseName);
         }
 
@@ -59,7 +59,9 @@ namespace WebScrapperApi.Data
                         Builders<CaterChoiceProduct>.Filter.Eq(p => p.Category, product.Category)
                     );
 
-                    var existingProduct = await collection.Find(filter).FirstOrDefaultAsync();
+                    var existingProduct = await collection
+                        .Find(filter)
+                        .FirstOrDefaultAsync();
 
                     if (existingProduct == null)
                     {
@@ -84,7 +86,8 @@ namespace WebScrapperApi.Data
 
                         var result = await collection.UpdateOneAsync(filter, update);
 
-                        Console.WriteLine($"Update Result - Product: {product.ProductName}, Matched: {result.MatchedCount}, Modified: {result.ModifiedCount}");
+                        Console.WriteLine(
+                            $"Update Result - Product: {product.ProductName}, Matched: {result.MatchedCount}, Modified: {result.ModifiedCount}");
 
                         if (result.ModifiedCount > 0)
                         {
@@ -112,55 +115,99 @@ namespace WebScrapperApi.Data
             var stats = new MongoStats();
             var collection = GetCollection<AdamsProduct>("adams", "adams");
 
+            Console.WriteLine($"🔄 Starting to save {products.Count} Adams products to MongoDB...");
+
             foreach (var product in products)
             {
                 try
                 {
-                    // Check if product already exists by name and category
-                    var filter = Builders<AdamsProduct>.Filter.And(
-                        Builders<AdamsProduct>.Filter.Eq(p => p.Sku, product.Sku),
-                        Builders<AdamsProduct>.Filter.Eq(p => p.Category, product.Category)
-                    );
+                    FilterDefinition<AdamsProduct> filter;
 
-                    var existingProduct = await collection.Find(filter).FirstOrDefaultAsync();
+                    // Debug logging
+                    Console.WriteLine(
+                        $"Processing product: {product.Name}, SKU: '{product.Sku}', Category: {product.Category}");
+
+                    if (!string.IsNullOrWhiteSpace(product.Sku))
+                    {
+                        // For numeric SKUs, use EXACT string matching (case-sensitive, no collation)
+                        // This ensures "001234" != "1234" and avoids any collation issues
+                        filter = Builders<AdamsProduct>.Filter.And(
+                            Builders<AdamsProduct>.Filter.Eq(p => p.Sku, product.Sku), // Exact string match
+                            Builders<AdamsProduct>.Filter.Eq(p => p.Category, product.Category)
+                        );
+                        Console.WriteLine(
+                            $"Using EXACT SKU+Category filter: SKU='{product.Sku}', Category='{product.Category}'");
+                    }
+                    else
+                    {
+                        // For names, we can still use exact matching
+                        filter = Builders<AdamsProduct>.Filter.And(
+                            Builders<AdamsProduct>.Filter.Eq(p => p.Name, product.Name),
+                            Builders<AdamsProduct>.Filter.Eq(p => p.Category, product.Category)
+                        );
+                        Console.WriteLine(
+                            $"Using EXACT Name+Category filter: Name='{product.Name}', Category='{product.Category}'");
+                    }
+
+                    // Use exact matching - no collation options
+                    var existingProduct = await collection
+                        .Find(filter)
+                        .FirstOrDefaultAsync();
 
                     if (existingProduct == null)
                     {
                         // Insert new product
+                        Console.WriteLine($"✅ Inserting NEW product: {product.Name} (SKU: {product.Sku})");
                         await collection.InsertOneAsync(product);
                         stats.NewRecordsAdded++;
                     }
                     else
                     {
+                        Console.WriteLine(
+                            $"🔄 Found EXISTING product: {existingProduct.Name} (SKU: {existingProduct.Sku})");
+                        Console.WriteLine($"   Existing ID: {existingProduct.ProductId}");
+                        Console.WriteLine($"   New timestamp: {product.ScrapedTimestamp}");
+
                         // Update existing product
                         var update = Builders<AdamsProduct>.Update
                             .Set(p => p.Sku, product.Sku)
+                            .Set(p => p.Name, product.Name)
                             .Set(p => p.ImageUrlScraped, product.ImageUrlScraped)
                             .Set(p => p.ImageFilenameLocal, product.ImageFilenameLocal)
                             .Set(p => p.ProductPageUrl, product.ProductPageUrl)
                             .Set(p => p.ScrapedFromCategoryPageUrl, product.ScrapedFromCategoryPageUrl)
                             .Set(p => p.ScrapedTimestamp, product.ScrapedTimestamp);
 
+                        // Use exact matching for update too - no collation
                         var result = await collection.UpdateOneAsync(filter, update);
-                        
+
+                        Console.WriteLine(
+                            $"Update Result - Product: {product.Name}, Matched: {result.MatchedCount}, Modified: {result.ModifiedCount}");
+
                         if (result.ModifiedCount > 0)
                         {
                             stats.ExistingRecordsUpdated++;
+                            Console.WriteLine($"✅ UPDATED existing product: {product.Name}");
                         }
                         else
                         {
                             stats.RecordsUnchanged++;
+                            Console.WriteLine($"➡️ Product UNCHANGED: {product.Name} (data identical)");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
                     stats.Errors++;
-                    Console.WriteLine($"❌ Failed to save Adams product: {product.Name}, Category: {product.Category}");
+                    Console.WriteLine(
+                        $"❌ Failed to save Adams product: {product.Name}, SKU: {product.Sku}, Category: {product.Category}");
                     Console.WriteLine($"Error: {ex.Message}");
+                    Console.WriteLine($"Stack Trace: {ex.StackTrace}");
                 }
             }
 
+            Console.WriteLine(
+                $"🏁 MongoDB save completed. New: {stats.NewRecordsAdded}, Updated: {stats.ExistingRecordsUpdated}, Unchanged: {stats.RecordsUnchanged}, Errors: {stats.Errors}");
             return stats;
         }
 
@@ -173,13 +220,15 @@ namespace WebScrapperApi.Data
             {
                 try
                 {
-                    // Check if product already exists by ProductId and Category
+                    // Check if product already exists by ProductName and Category
                     var filter = Builders<MetroProduct>.Filter.And(
                         Builders<MetroProduct>.Filter.Eq(p => p.ProductName, product.ProductName),
                         Builders<MetroProduct>.Filter.Eq(p => p.Category, product.Category)
                     );
 
-                    var existingProduct = await collection.Find(filter).FirstOrDefaultAsync();
+                    var existingProduct = await collection
+                        .Find(filter)
+                        .FirstOrDefaultAsync();
 
                     if (existingProduct == null)
                     {
@@ -219,7 +268,8 @@ namespace WebScrapperApi.Data
                 catch (Exception ex)
                 {
                     stats.Errors++;
-                    Console.WriteLine($"❌ Failed to save Metro product: {product.ProductName}, Category: {product.Category}");
+                    Console.WriteLine(
+                        $"❌ Failed to save Metro product: {product.ProductName}, Category: {product.Category}");
                     Console.WriteLine($"Error: {ex.Message}");
                 }
             }
@@ -240,4 +290,4 @@ namespace WebScrapperApi.Data
         public int RecordsUnchanged { get; set; }
         public int Errors { get; set; }
     }
-} 
+}
