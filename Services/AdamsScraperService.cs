@@ -3,7 +3,10 @@ using System.Linq;
 
 namespace WebScrapperApi.Services
 {
-    public class AdamsScraperService(UtilityService utilityService, LoggerService loggerService, ScraperDbContext dbContext)
+    public class AdamsScraperService(
+        UtilityService utilityService,
+        LoggerService loggerService,
+        ScraperDbContext dbContext)
     {
         private readonly UtilityService _utilityService = utilityService;
         private readonly LoggerService _loggerService = loggerService;
@@ -20,13 +23,18 @@ namespace WebScrapperApi.Services
 
             try
             {
-                await _dbContext.ConnectAsync();
-                mongoEnabled = true;
-                _loggerService.Log("Adams", LogLevel.Information, "MongoDB connection established using ScraperDbContext");
+                if (options.StoreInMongoDB)
+                {
+                    await _dbContext.ConnectAsync();
+                    mongoEnabled = true;
+                    _loggerService.Log("Adams", LogLevel.Information,
+                        "MongoDB connection established using ScraperDbContext");
+                }
             }
             catch (Exception ex)
             {
-                _loggerService.Log("Adams", LogLevel.Error, $"Failed to connect to MongoDB. Proceeding without database integration. - Exception: {ex.Message}");
+                _loggerService.Log("Adams", LogLevel.Error,
+                    $"Failed to connect to MongoDB. Proceeding without database integration. - Exception: {ex.Message}");
                 mongoEnabled = false;
             }
 
@@ -46,7 +54,8 @@ namespace WebScrapperApi.Services
 
                     try
                     {
-                        var categoryProducts = await ScrapeCategoryAsync(MapModels.ScrapingOptions(options), category, browser);
+                        var categoryProducts =
+                            await ScrapeCategoryAsync(MapModels.ScrapingOptions(options), category, browser);
 
                         allProducts.AddRange(categoryProducts);
                         statistics.CategoriesProcessed.Add(category.Name);
@@ -68,7 +77,8 @@ namespace WebScrapperApi.Services
                     }
                     catch (Exception ex)
                     {
-                        _loggerService.Log("Adams", LogLevel.Error, $"Error scraping Adams category {category.Name} - Exception: {ex.Message}");
+                        _loggerService.Log("Adams", LogLevel.Error,
+                            $"Error scraping Adams category {category.Name} - Exception: {ex.Message}");
                         statistics.Errors++;
                     }
                 }
@@ -116,12 +126,14 @@ namespace WebScrapperApi.Services
             }
             catch (Exception ex)
             {
-                _loggerService.Log("Adams", LogLevel.Critical, $"Error during Adams scraping process - Exception: {ex.Message}");
+                _loggerService.Log("Adams", LogLevel.Critical,
+                    $"Error during Adams scraping process - Exception: {ex.Message}");
                 throw;
             }
         }
 
-        public async Task<List<AdamsProduct>> ScrapeCategoryAsync(ScrapingOptions options, Category category, IBrowser? existingBrowser = null)
+        public async Task<List<AdamsProduct>> ScrapeCategoryAsync(ScrapingOptions options, Category category,
+            IBrowser? existingBrowser = null)
         {
             _loggerService.Log("Adams", LogLevel.Information, $"Starting to scrape Adams category: {category.Name}");
             _loggerService.Log("Adams", LogLevel.Information, $"Category URL: {category.Url}");
@@ -136,11 +148,13 @@ namespace WebScrapperApi.Services
             {
                 await _dbContext.ConnectAsync();
                 mongoEnabled = true;
-                _loggerService.Log("Adams", LogLevel.Information, "MongoDB connection established using ScraperDbContext");
+                _loggerService.Log("Adams", LogLevel.Information,
+                    "MongoDB connection established using ScraperDbContext");
             }
             catch (Exception ex)
             {
-                _loggerService.Log("Adams", LogLevel.Error, $"Failed to connect to MongoDB. Proceeding without database integration. - Exception: {ex.Message}");
+                _loggerService.Log("Adams", LogLevel.Error,
+                    $"Failed to connect to MongoDB. Proceeding without database integration. - Exception: {ex.Message}");
                 mongoEnabled = false;
             }
 
@@ -179,19 +193,21 @@ namespace WebScrapperApi.Services
                 await page.GotoAsync(category.Url, new PageGotoOptions { Timeout = 60000 });
 
                 // Wait for the page to fully load
-                await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 30000 });
+                await page.WaitForLoadStateAsync(LoadState.NetworkIdle,
+                    new PageWaitForLoadStateOptions { Timeout = 30000 });
                 _loggerService.Log("Adams", LogLevel.Information, "Page fully loaded");
 
                 // Take a screenshot of the category page for debugging
                 var screenshotDir = Path.Combine("screenshots", "adams");
                 Directory.CreateDirectory(screenshotDir);
                 var screenshotPath = Path.Combine(screenshotDir, $"adams-{category.Name}-page.png");
-                await page.ScreenshotAsync(new PageScreenshotOptions 
+                await page.ScreenshotAsync(new PageScreenshotOptions
                 {
-                    Path = screenshotPath, 
-                    FullPage = true 
+                    Path = screenshotPath,
+                    FullPage = true
                 });
-                _loggerService.Log("Adams", LogLevel.Information, $"Category page screenshot saved as {screenshotPath}");
+                _loggerService.Log("Adams", LogLevel.Information,
+                    $"Category page screenshot saved as {screenshotPath}");
 
                 // Try multiple selectors to find products
                 var productsFound = false;
@@ -229,7 +245,8 @@ namespace WebScrapperApi.Services
                             if (elements.Count > 0)
                             {
                                 productElements = elements.ToList();
-                                _loggerService.Log("Adams", LogLevel.Information, $"Found {productElements.Count} products using selector: {itemSelector}");
+                                _loggerService.Log("Adams", LogLevel.Information,
+                                    $"Found {productElements.Count} products using selector: {itemSelector}");
                                 productsFound = true;
                                 break;
                             }
@@ -245,7 +262,8 @@ namespace WebScrapperApi.Services
 
                 if (!productsFound || productElements.Count == 0)
                 {
-                    _loggerService.Log("Adams", LogLevel.Warning, "No products found with any selector. Checking page content...");
+                    _loggerService.Log("Adams", LogLevel.Warning,
+                        "No products found with any selector. Checking page content...");
                     var pageContent = await page.ContentAsync();
                     var htmlDebugDir = Path.Combine("screenshots", "adams");
                     Directory.CreateDirectory(htmlDebugDir);
@@ -257,65 +275,92 @@ namespace WebScrapperApi.Services
                     return new List<AdamsProduct>();
                 }
 
-                _loggerService.Log("Adams", LogLevel.Information, $"Found {productElements.Count} product elements, extracting data...");
+                _loggerService.Log("Adams", LogLevel.Information,
+                    $"Found {productElements.Count} product elements, extracting data...");
 
                 // Extract products from current page
-                var pageProducts = await ExtractProductsFromPageAsync(page, category.Name, category.Url, options.DownloadImages, productElements);
+                var pageProducts = await ExtractProductsFromPageAsync(page, category.Name, category.Url,
+                    options.DownloadImages, productElements);
                 products.AddRange(pageProducts);
 
-                _loggerService.Log("Adams", LogLevel.Information, $"Extracted {pageProducts.Count} valid products from {category.Name}");
+                _loggerService.Log("Adams", LogLevel.Information,
+                    $"Extracted {pageProducts.Count} valid products from {category.Name}");
 
-                // Try to find and click "Load More" button
-                try
+                // Start paginated URL-based scraping
+                var seenProductUrls =
+                    new HashSet<string>(products.Select(p => p.ProductPageUrl!).Where(u => !string.IsNullOrEmpty(u)));
+                int pageNumber = 2;
+                const int MAX_PAGES = 50;
+
+                while (pageNumber <= MAX_PAGES)
                 {
-                    var loadMoreButton = await page.QuerySelectorAsync(AdamsConfig.AdamsSelectors.LOAD_MORE_BUTTON);
-                    var loadMoreCount = 0;
-                    const int MAX_LOAD_MORE = 20; // Reduced limit
+                    var paginatedUrl = category.Url.TrimEnd('/') + $"/page/{pageNumber}/";
+                    _loggerService.Log("Adams", LogLevel.Information,
+                        $"Navigating to page {pageNumber}: {paginatedUrl}");
 
-                    while (loadMoreButton != null && loadMoreCount < MAX_LOAD_MORE)
+                    await page.GotoAsync(paginatedUrl, new PageGotoOptions { Timeout = 60000 });
+                    await page.WaitForLoadStateAsync(LoadState.NetworkIdle,
+                        new PageWaitForLoadStateOptions { Timeout = 30000 });
+
+                    // Wait for product elements to appear or timeout
+                    try
                     {
-                        _loggerService.Log("Adams", LogLevel.Information, $"Clicking load more button (attempt {loadMoreCount + 1})");
-                        await loadMoreButton.ClickAsync();
-                        // wait for network idle state to ensure new products are loaded
-                        await page.WaitForLoadStateAsync(LoadState.NetworkIdle, new PageWaitForLoadStateOptions { Timeout = 30000 });
-
-                        // Get new product elements
-                        // wait for the new product elements to appear
-                        _loggerService.Log("Adams", LogLevel.Information, "Checking for new products after load more button click...");
-                        await page.WaitForSelectorAsync(AdamsConfig.AdamsSelectors.PRODUCT_ITEM, new PageWaitForSelectorOptions { Timeout = 10000 });
-                        var newProductElements = await page.QuerySelectorAllAsync(AdamsConfig.AdamsSelectors.PRODUCT_ITEM);
-                        if (newProductElements.Count > 0)
-                        {
-                            var newElements = newProductElements.ToList();
-                            var newProducts = await ExtractProductsFromPageAsync(
-                                page,
-                                category.Name,
-                                category.Url,
-                                options.DownloadImages,
-                                newElements);
-                            products.AddRange(newProducts);
-                            productElements = newProductElements.ToList();
-
-                            _loggerService.Log("Adams", LogLevel.Information, $"Loaded {newProducts.Count} additional products");
-                        }
-
-                        // Check if there's still a "Load More" button
-                        loadMoreButton = await page.QuerySelectorAsync(AdamsConfig.AdamsSelectors.LOAD_MORE_BUTTON);
-                        loadMoreCount++;
+                        await page.WaitForSelectorAsync(AdamsConfig.AdamsSelectors.PRODUCT_ITEM,
+                            new PageWaitForSelectorOptions { Timeout = 10000 });
                     }
+                    catch (TimeoutException)
+                    {
+                        _loggerService.Log("Adams", LogLevel.Information,
+                            $"No products found on page {pageNumber}. Exiting pagination.");
+                        break;
+                    }
+
+                    productElements =
+                        (await page.QuerySelectorAllAsync(AdamsConfig.AdamsSelectors.PRODUCT_ITEM)).ToList();
+                    if (productElements == null || productElements.Count == 0)
+                    {
+                        _loggerService.Log("Adams", LogLevel.Information,
+                            $"Empty product list on page {pageNumber}. Exiting pagination.");
+                        break;
+                    }
+
+                    var newPageProducts = await ExtractProductsFromPageAsync(
+                        page, category.Name, paginatedUrl, options.DownloadImages, productElements.ToList());
+                    // Filter duplicates
+                    var newUniqueProducts = newPageProducts
+                        .Where(p => !string.IsNullOrEmpty(p.ProductPageUrl) &&
+                                    !seenProductUrls.Contains(p.ProductPageUrl))
+                        .ToList();
+
+                    if (newUniqueProducts.Count == 0)
+                    {
+                        _loggerService.Log("Adams", LogLevel.Information,
+                            $"No new products found on page {pageNumber}. Exiting pagination.");
+                        break;
+                    }
+
+                    foreach (var p in newUniqueProducts)
+                    {
+                        seenProductUrls.Add(p.ProductPageUrl!);
+                        products.Add(p);
+                    }
+
+                    _loggerService.Log("Adams", LogLevel.Information,
+                        $"Extracted {newUniqueProducts.Count} new products from page {pageNumber}");
+
+                    pageNumber++;
                 }
-                catch (Exception ex)
-                {
-                    _loggerService.Log("Adams", LogLevel.Warning, $"Load more functionality failed: {ex.Message}");
-                }
+
 
                 // Save to MongoDB if enabled
                 var mongoStats = new MongoStats();
                 if (mongoEnabled && products.Count > 0)
                 {
-                    _loggerService.Log("Adams", LogLevel.Information, $"Saving {products.Count} products to MongoDB...");
+                    _loggerService.Log("Adams", LogLevel.Information,
+                        $"Saving {products.Count} products to MongoDB...");
                     mongoStats = await _dbContext.SaveAdamsProductsAsync(products);
-                    _loggerService.Log("Adams", LogLevel.Information, $"MongoDB save stats: {System.Text.Json.JsonSerializer.Serialize(mongoStats)}");
+                    _loggerService.Log("Adams", LogLevel.Information,
+                        $"MongoDB save stats: {System.Text.Json.JsonSerializer.Serialize(mongoStats)}");
                 }
 
                 // If this is a standalone category scrape
@@ -357,7 +402,8 @@ namespace WebScrapperApi.Services
                         _dbContext.Disconnect();
                     }
 
-                    _loggerService.Log("Adams", LogLevel.Information, $"Adams category scraping completed successfully for category: {category.Name}");
+                    _loggerService.Log("Adams", LogLevel.Information,
+                        $"Adams category scraping completed successfully for category: {category.Name}");
                 }
 
                 return products;
@@ -386,9 +432,11 @@ namespace WebScrapperApi.Services
             }
         }
 
-        private async Task<List<AdamsProduct>> ExtractProductsFromPageAsync(IPage page, string categoryName, string categoryUrl, bool downloadImages, List<IElementHandle> productElements)
+        private async Task<List<AdamsProduct>> ExtractProductsFromPageAsync(IPage page, string categoryName,
+            string categoryUrl, bool downloadImages, List<IElementHandle> productElements)
         {
-            _loggerService.Log("Adams", LogLevel.Information, $"Extracting products from page for category: {categoryName}");
+            _loggerService.Log("Adams", LogLevel.Information,
+                $"Extracting products from page for category: {categoryName}");
             var products = new List<AdamsProduct>();
             var seenProducts = new HashSet<string>();
 
@@ -400,7 +448,8 @@ namespace WebScrapperApi.Services
 
                 try
                 {
-                    _loggerService.Log("Adams", LogLevel.Information, $"Processing product {i + 1} of {productElements.Count}");
+                    _loggerService.Log("Adams", LogLevel.Information,
+                        $"Processing product {i + 1} of {productElements.Count}");
 
                     // Try multiple selectors for product name
                     IElementHandle? nameElement = null;
@@ -425,7 +474,8 @@ namespace WebScrapperApi.Services
                                 name = await nameElement.InnerTextAsync();
                                 if (!string.IsNullOrEmpty(name) && name.Trim() != "")
                                 {
-                                    _loggerService.Log("Adams", LogLevel.Information, $"Found product name using selector {selector}: {name}");
+                                    _loggerService.Log("Adams", LogLevel.Information,
+                                        $"Found product name using selector {selector}: {name}");
                                     break;
                                 }
                             }
@@ -439,7 +489,8 @@ namespace WebScrapperApi.Services
                     // Skip if we couldn't get a valid name or if it's a duplicate
                     if (string.IsNullOrEmpty(name) || name == "Unknown Product" || seenProducts.Contains(name))
                     {
-                        _loggerService.Log("Adams", LogLevel.Information, $"Skipping product {i + 1}: {(name == "Unknown Product" ? "no valid name" : "duplicate")}");
+                        _loggerService.Log("Adams", LogLevel.Information,
+                            $"Skipping product {i + 1}: {(name == "Unknown Product" ? "no valid name" : "duplicate")}");
                         continue;
                     }
 
@@ -483,7 +534,8 @@ namespace WebScrapperApi.Services
                                 sku = await skuElement.InnerTextAsync();
                                 if (!string.IsNullOrEmpty(sku) && sku.Trim() != "")
                                 {
-                                    _loggerService.Log("Adams", LogLevel.Information, $"Found SKU using selector {selector}: {sku}");
+                                    _loggerService.Log("Adams", LogLevel.Information,
+                                        $"Found SKU using selector {selector}: {sku}");
                                     break;
                                 }
                             }
@@ -513,7 +565,8 @@ namespace WebScrapperApi.Services
                                 imageUrl = await imageElement.GetAttributeAsync("src");
                                 if (!string.IsNullOrEmpty(imageUrl))
                                 {
-                                    _loggerService.Log("Adams", LogLevel.Information, $"Found image using selector {selector}");
+                                    _loggerService.Log("Adams", LogLevel.Information,
+                                        $"Found image using selector {selector}");
                                     break;
                                 }
                             }
@@ -532,11 +585,13 @@ namespace WebScrapperApi.Services
                     if (downloadImages && !string.IsNullOrEmpty(imageUrl))
                     {
                         _loggerService.Log("Adams", LogLevel.Information, $"Downloading image for product: {name}");
-                        var imageResult = await _utilityService.DownloadImageAsync(imageUrl, productNameHash, "images/adams");
+                        var imageResult =
+                            await _utilityService.DownloadImageAsync(imageUrl, productNameHash, "images/adams");
                         if (imageResult != null)
                         {
                             localImageFilename = imageResult.Filename;
-                            _loggerService.Log("Adams", LogLevel.Information, $"Image downloaded: {localImageFilename}");
+                            _loggerService.Log("Adams", LogLevel.Information,
+                                $"Image downloaded: {localImageFilename}");
                         }
                     }
 
@@ -560,11 +615,13 @@ namespace WebScrapperApi.Services
                 }
                 catch (Exception ex)
                 {
-                    _loggerService.Log("Adams", LogLevel.Error, $"Error extracting product {i + 1} - Exception: {ex.Message}");
+                    _loggerService.Log("Adams", LogLevel.Error,
+                        $"Error extracting product {i + 1} - Exception: {ex.Message}");
                 }
             }
 
-            _loggerService.Log("Adams", LogLevel.Information, $"Successfully extracted {products.Count} products from {categoryName}");
+            _loggerService.Log("Adams", LogLevel.Information,
+                $"Successfully extracted {products.Count} products from {categoryName}");
             return products;
         }
     }
