@@ -27,7 +27,7 @@ public class CaterChoiceScraperService(
         {
             try
             {
-                await DbContext.ConnectAsync();
+                await DbContext.ConnectAsync("caterchoice");
                 mongoEnabled = true;
                 _loggerService.Log("CaterChoice", LogLevel.Information, "MongoDB connection established using ScraperDbContext");
             }
@@ -173,7 +173,7 @@ public class CaterChoiceScraperService(
         {
             try
             {
-                await DbContext.ConnectAsync();
+                await DbContext.ConnectAsync("caterchoice");
                 mongoEnabled = true;
                 _loggerService.Log("CaterChoice", LogLevel.Information, "MongoDB connection established using ScraperDbContext");
             }
