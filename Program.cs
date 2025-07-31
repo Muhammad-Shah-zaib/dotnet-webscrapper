@@ -1,4 +1,4 @@
-global using WebScrapperApi.Services;
+﻿global using WebScrapperApi.Services;
 global using WebScrapperApi.Models;
 global using WebScrapperApi.Data;
 global using Microsoft.Playwright;
@@ -18,7 +18,7 @@ builder.Services.AddScoped<MetroScraperService>();
 builder.Services.AddScoped<LoggerService>();
 
 // singleton Scrapper Lock So only one Scrapper runs at a time
-builder.Services.AddSingleton<ScraperLockService> ();
+builder.Services.AddSingleton<ScraperLockService>();
 
 // Register database context
 builder.Services.AddScoped<ScraperDbContext>();

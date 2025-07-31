@@ -11,11 +11,9 @@ namespace WebScrapperApi.Data
         public ScraperDbContext(IConfiguration configuration)
         {
             _configuration = configuration;
-            var connectionString = _configuration.GetConnectionString("MongoDB") ??
-                                   _configuration["ConnectionStrings:MongoDB"];
+            var connectionString = _configuration["ConnectionStrings:DefaultMongo"];
 
             _client = new MongoClient(connectionString);
-
             // Get database mapping from configuration
             _databaseMapping = _configuration.GetSection("MongoDB:ScraperDatabases")
                 .Get<Dictionary<string, string>>() ?? new Dictionary<string, string>();
@@ -37,10 +35,9 @@ namespace WebScrapperApi.Data
             return database.GetCollection<T>(collectionName);
         }
 
-        public async Task ConnectAsync()
+        public async Task ConnectAsync(string scraperName)
         {
-            // Test the connection
-            var database = GetDatabase("caterchoice"); // Use any database for connection test
+            var database = GetDatabase(scraperName);
             await database.RunCommandAsync((Command<object>)"{ping:1}");
         }
 

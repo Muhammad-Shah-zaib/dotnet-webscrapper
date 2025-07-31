@@ -22,7 +22,7 @@ namespace WebScrapperApi.Services
             {
                 try
                 {
-                    await _dbContext.ConnectAsync();
+                    await _dbContext.ConnectAsync("adams");
                     mongoEnabled = true;
                     _loggerService.Log("Adams", LogLevel.Information,
                         "MongoDB connection established using ScraperDbContext");
@@ -147,7 +147,7 @@ namespace WebScrapperApi.Services
             {
                 try
                 {
-                    await _dbContext.ConnectAsync();
+                    await _dbContext.ConnectAsync("adams");
                     mongoEnabled = true;
                     _loggerService.Log("Adams", LogLevel.Information,
                         "MongoDB connection established using ScraperDbContext");
