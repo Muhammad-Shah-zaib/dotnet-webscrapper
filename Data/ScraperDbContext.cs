@@ -11,6 +11,7 @@ namespace WebScrapperApi.Data
         public ScraperDbContext(IConfiguration configuration)
         {
             _configuration = configuration;
+
             var connectionString = _configuration["ConnectionStrings:DefaultMongo"];
 
             _client = new MongoClient(connectionString);
